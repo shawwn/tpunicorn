@@ -1,0 +1,25 @@
+# Invoke implicitly required by self/pip install -e .
+# Invocations for common project tasks
+invocations>=1.0,<2.0
+# pytest-relaxed for test organization, display etc tweaks
+pytest-relaxed>=1.0.1,<1.1
+pytest==3.2.5
+# pytest-cov for coverage
+pytest-cov==2.5.1
+six==1.10.0
+# Mock for test mocking
+mock==1.0.1
+# Linting!
+flake8==3.6.0
+# Coverage!
+coverage==3.7.1
+codecov==1.6.3
+# Documentation tools
+sphinx>=1.4,<1.7
+alabaster==0.7.12
+releases>=1.5,<2.0
+# Release tools
+semantic_version>=2.4,<2.5
+wheel==0.24
+twine==1.11.0
+
