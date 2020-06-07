@@ -34,19 +34,46 @@ def parse_tpu_index(tpu):
   return idx
 
 def get_tpu_zones():
-  return ["europe-west4-a", "us-central1-f", "us-central1-a"]
+  return [
+    #"asia-east1-a",
+    #"asia-east1-b",
+    "asia-east1-c",
+    "europe-west4-a",
+    #"europe-west4-b",
+    #"europe-west4-c",
+    "us-central1-a",
+    "us-central1-b",
+    "us-central1-c",
+    "us-central1-f",
+    #"us-east1-b",
+    #"us-east1-c",
+    #"us-east1-d",
+  ]
+
+import threading
 
 @ring.lru(expire=15) # seconds
+def fetch_tpus():
+  zones = get_tpu_zones()
+  tpus = []
+  threads = [threading.Thread(target=lambda zone: tpus.extend(list_tpus(zone)), args=(zone,), daemon=True) for zone in zones]
+  for thread in threads:
+    thread.start()
+  for thread in threads:
+    thread.join()
+  return tpus
+
+def list_tpus(zone):
+  out = run("gcloud compute tpus list", format="json", zone=zone)
+  tpus = json.loads(out)
+  return list(sorted(tpus, key=parse_tpu_index))
+
 def get_tpus(zone=None):
+  tpus = fetch_tpus()
   if zone is None:
-    tpus = []
-    for zone in get_tpu_zones():
-      tpus.extend(get_tpus(zone=zone))
     return tpus
   else:
-    out = run("gcloud compute tpus list", format="json", zone=zone)
-    tpus = json.loads(out)
-    return sorted(tpus, key=parse_tpu_index)
+    return [tpu for tpu in tpus if '/{}/'.format(zone) in tpu['name']]
 
 from string import Formatter
 
@@ -67,7 +94,7 @@ class NamespaceFormatter(Formatter):
 
 from collections import defaultdict
 
-@ring.lru(expire=60) # seconds
+@ring.lru(expire=1) # seconds
 def format_widths():
   headers = format_headers()
   tpus = get_tpus()
@@ -108,7 +135,7 @@ def nice_since(iso):
   d = (t // 86400)
   r = []
   out = True
-  if d > 0:
+  if d > 0 or out:
     out = True
     r += ['{:02d}d'.format(d)]
   if h > 0 or out:
@@ -120,11 +147,12 @@ def nice_since(iso):
   if s > 0 or out:
     out = True
     r += ['{:02d}s'.format(s)]
-  return ','.join(r)
+  return ','.join(r).replace('00d,', '    ')
 
 def format_headers():
   return {
     'kind': 'HEADER',
+    'zone': 'ZONE',
     'id': 'ID',
     'fqn': 'FQN',
     'ip': 'IP',
@@ -144,6 +172,7 @@ def _format_args(tpu):
   preemptible = tpu.get('schedulingConfig', {'preemptible': False}).get('preemptible', False)
   return {
     'kind': 'tpu',
+    'zone': tpu['name'].split('/')[-3],
     'id': tpu['name'].split('/')[-1],
     'fqn': tpu['name'],
     'ip': tpu['ipAddress'],
@@ -164,7 +193,7 @@ def format_args(tpu):
   r.update(format_widths())
   return r
 
-def format(tpu, spec="{index:<{index_w}} {type:{type_w}} {age:>{age_w}}  {id:{id_w}} {status:{status_w}} {health:{health_w}} {master:{master_w}} {range:{range_w}} {preemptible!s:{preemptible_w}}", formatter=NamespaceFormatter):
+def format(tpu, spec="{zone:{zone_w}} {index:<{index_w}} {type:{type_w}} {age:{age_w}}  {id:{id_w}} {status:{status_w}} {health:{health_w}} {master:{master_w}} {range:{range_w}} {preemptible!s:{preemptible_w}}", formatter=NamespaceFormatter):
   #pp(tpu)
   if tpu.get('kind', 'tpu') == 'tpu':
     args = format_args(tpu)
