@@ -4,6 +4,7 @@ import json
 import re
 import ring
 import sys
+import os
 from pprint import pprint as pp
 
 
@@ -12,10 +13,20 @@ def ero(*args):
   if len(args) > 0:
     return args[0]
 
+def build_opt(k, v):
+  k = k.replace('__', '#').replace('_', '-').replace('#', '_')
+  if v is True:
+    return '--' + k
+  if v is False:
+    return '--no-' + k
+  return '--{} {}'.format(k, shellquote(v))
 
 def build_commandline(cmd, *args, **kws):
-  return ' '.join([cmd] + [shellquote(x) for x in args] + ['--{} {}'.format(k, shellquote(v)) for k, v in kws.items()])
+  return ' '.join([cmd] + [shellquote(x) for x in args] + [build_opt(k, v) for k, v in kws.items() if v is not None])
 
+def system(cmd, *args, **kws):
+  command = build_commandline(cmd, *args, **kws)
+  os.system(command)
 
 def run(cmd, *args, **kws):
   command = build_commandline(cmd, *args, **kws)
@@ -23,15 +34,30 @@ def run(cmd, *args, **kws):
   out = check_output(ero(command), shell=True)
   return out
 
+def parse_tpu_project(tpu):
+  fqn = tpu if isinstance(tpu, str) else tpu['name']
+  return fqn.split('/')[-5]
+
+def parse_tpu_zone(tpu):
+  fqn = tpu if isinstance(tpu, str) else tpu['name']
+  return fqn.split('/')[-3]
+
+def parse_tpu_id(tpu):
+  fqn = tpu if isinstance(tpu, str) else tpu['name']
+  return fqn.split('/')[-1]
 
 def parse_tpu_index(tpu):
-  name = tpu if isinstance(tpu, str) else tpu['name']
-  idx = re.findall(r'[-]([0-9]+)$', name)
+  fqn = tpu if isinstance(tpu, str) else tpu['name']
+  idx = re.findall(r'([0-9]+)$', fqn)
   if len(idx) <= 0:
     idx = -1
   else:
     idx = int(idx[0])
   return idx
+
+def parse_tpu_network(tpu):
+  net = tpu if isinstance(tpu, str) else tpu['network']
+  return net.split('/')[-1]
 
 def get_tpu_zones():
   return [
@@ -74,6 +100,21 @@ def get_tpus(zone=None):
     return tpus
   else:
     return [tpu for tpu in tpus if '/{}/'.format(zone) in tpu['name']]
+
+def get_tpu(tpu, zone=None):
+  if isinstance(tpu, str) and re.match('^[0-9]+$', tpu):
+    tpu = int(tpu)
+  if isinstance(tpu, int):
+    which = 'index'
+    tpus = [x for x in get_tpus(zone=zone) if parse_tpu_index(x) == tpu]
+  else:
+    which = 'id'
+    tpus = [x for x in get_tpus(zone=zone) if parse_tpu_id(x) == tpu]
+  if len(tpus) > 1:
+    raise ValueError("Multiple TPUs matched {} {!r}. Try specifying --zone".format(which, tpu))
+  if len(tpus) <= 0:
+    raise ValueError("No TPUs matched {} {!r}".format(which, tpu))
+  return tpus[0]
 
 from string import Formatter
 
@@ -144,14 +185,15 @@ def nice_since(iso):
   if m > 0 or out:
     out = True
     r += ['{:02d}m'.format(m)]
-  if s > 0 or out:
-    out = True
-    r += ['{:02d}s'.format(s)]
-  return ','.join(r).replace('00d,', '    ')
+  # if s > 0 or out:
+  #   out = True
+  #   r += ['{:02d}s'.format(s)]
+  return ''.join(r).replace('00d', '   ')
 
 def format_headers():
   return {
     'kind': 'HEADER',
+    'project': 'PROJECT',
     'zone': 'ZONE',
     'id': 'ID',
     'fqn': 'FQN',
@@ -166,34 +208,59 @@ def format_headers():
     'status': 'STATUS',
     'health': 'HEALTH',
     'index': 'INDEX',
+    'version': 'VERSION',
+    'network': 'NETWORK',
   }
 
 def _format_args(tpu):
-  preemptible = tpu.get('schedulingConfig', {'preemptible': False}).get('preemptible', False)
   return {
     'kind': 'tpu',
-    'zone': tpu['name'].split('/')[-3],
-    'id': tpu['name'].split('/')[-1],
+    'project': parse_tpu_project(tpu),
+    'zone': parse_tpu_zone(tpu),
+    'id': parse_tpu_id(tpu),
     'fqn': tpu['name'],
-    'ip': tpu['ipAddress'],
+    'ip': parse_tpu_ip(tpu),
     'port': tpu['port'],
-    'master': '{}:{}'.format(tpu['ipAddress'], tpu['port']),
-    'range': tpu['cidrBlock'],
-    'type': tpu['acceleratorType'],
+    'master': parse_tpu_master(tpu),
+    'range': parse_tpu_range(tpu),
+    'type': parse_tpu_type(tpu),
     'created': tpu['createTime'],
     'age': nice_since(tpu['createTime']),
-    'preemptible': 'yes' if preemptible else 'no',
+    'preemptible': 'yes' if parse_tpu_preemptible(tpu) else 'no',
     'status': tpu['state'],
     'health': tpu.get('health', 'UNKNOWN'),
     'index': parse_tpu_index(tpu),
+    'version': parse_tpu_version(tpu),
+    'network': parse_tpu_network(tpu),
   }
+
+def parse_tpu_preemptible(tpu):
+  return tpu.get('schedulingConfig', {'preemptible': False}).get('preemptible', False)
+
+def parse_tpu_ip(tpu):
+  return tpu.get('ipAddress', '')
+
+def parse_tpu_master(tpu):
+  return '{}:{}'.format(tpu.get('ipAddress',''), tpu.get('port', 8470))
+
+def parse_tpu_range(tpu):
+  return tpu['cidrBlock']
+
+def parse_tpu_version(tpu):
+  return tpu['tensorflowVersion']
+
+def parse_tpu_type(tpu):
+  return tpu['acceleratorType']
+
+def parse_tpu_description(tpu):
+  return tpu.get('description', '')
 
 def format_args(tpu):
   r = _format_args(tpu)
   r.update(format_widths())
   return r
 
-def format(tpu, spec="{zone:{zone_w}} {index:<{index_w}} {type:{type_w}} {age:{age_w}}  {id:{id_w}} {status:{status_w}} {health:{health_w}} {master:{master_w}} {range:{range_w}} {preemptible!s:{preemptible_w}}", formatter=NamespaceFormatter):
+def format(tpu, spec="{zone:{zone_w}} {index:<{index_w}} {type:{type_w}} {age:{age_w}}  {id:{id_w}} {status:{status_w}} {health:{health_w}} {version:{version_w}} {network:{network_w}} {master:{master_w}} {range:{range_w}} {preemptible!s:{preemptible_w}}", formatter=NamespaceFormatter):
   #pp(tpu)
   if tpu.get('kind', 'tpu') == 'tpu':
     args = format_args(tpu)
@@ -203,3 +270,18 @@ def format(tpu, spec="{zone:{zone_w}} {index:<{index_w}} {type:{type_w}} {age:{a
     args.update(format_widths())
   fmt = formatter(args)
   return fmt.format(spec)
+
+def create_tpu_command(tpu):
+  description = parse_tpu_description(tpu)
+  if len(description) <= 0:
+    description = None
+  return build_commandline("gcloud compute tpus create",
+                           parse_tpu_id(tpu),
+                           zone=parse_tpu_zone(tpu),
+                           network=parse_tpu_network(tpu),
+                           range=parse_tpu_range(tpu),
+                           version=parse_tpu_version(tpu),
+                           accelerator_type=parse_tpu_type(tpu),
+                           preemptible=True if parse_tpu_preemptible(tpu) else None,
+                           description=description,
+                           )
