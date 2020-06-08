@@ -1,12 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-# Support setuptools only, distutils has a divergent and more annoying API and
-# few folks will lack setuptools.
 import setuptools
 import os
 
 package_name = "tpudiepie"
-binary_name = "tpu"
+binary_name = "die"
 packages = setuptools.find_packages(
     include=[package_name, "{}.*".format(package_name)]
 )
@@ -19,7 +17,7 @@ version = _locals["__version__"]
 
 # Frankenstein long_description: changelog note + README
 long_description = """
-To find out what's new in this version of TPUDiePie, please see `the repo
+To find out what's new in this version of tpudiepie, please see `the repo
 <https://github.com/shawwn/tpudiepie>`_.
 
 {}
@@ -37,12 +35,15 @@ setuptools.setup(
     author_email="shawnpresser@gmail.com",
     url="https://github.com/shawwn/tpudiepie",
     install_requires=[
-        "invoke>=1.0,<2.0",
+        'Click>=7.1.2',
+        'six>=1.11.0',
+        'ring>=0.7.3',
     ],
     packages=packages,
     entry_points={
         "console_scripts": [
-            "{} = {}.main:program.main".format(binary_name, package_name)
+            "{} = {}.main:program.main".format(package_name, package_name),
+            "{} = {}.main:program.main".format(binary_name, package_name),
         ]
     },
     classifiers=[

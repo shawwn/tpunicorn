@@ -6,6 +6,8 @@ import ring
 import sys
 import os
 import logging
+import threading
+import contextlib
 from pprint import pprint as pp
 
 logger = logging.getLogger('tpudiepie')
@@ -16,30 +18,15 @@ ch.setLevel(logging.DEBUG)
 
 # create formatter
 formatter = logging.Formatter('%(asctime)s|%(levelname)s|%(message)s', datefmt='%m-%d-%Y %I:%M:%S%p %Z')
-
-# add formatter to ch
 ch.setFormatter(formatter)
-
-# add ch to logger
 logger.addHandler(ch)
-
-def is_verbose():
-  import click
-  ctx = click.get_current_context(silent=True)
-  if ctx:
-    return ctx.obj['verbose']
-  return False
 
 def ero(x):
   logger.info('%s', x)
   return x
-  # if is_verbose():
-  #   print(*args, file=sys.stderr)
-  # if len(args) > 0:
-  #   return args[0]
 
 def build_opt(k, v):
-  k = k.replace('__', '#').replace('_', '-').replace('#', '_')
+  k = k.replace('_', '-').replace('--', '_')
   if v is True:
     return '--' + k
   if v is False:
@@ -55,7 +42,6 @@ def system(cmd, *args, **kws):
 
 def run(cmd, *args, **kws):
   command = build_commandline(cmd, *args, **kws)
-  #out = invoke.run(ero(command), hide="out").stdout
   out = check_output(ero(command), shell=True)
   return out
 
@@ -101,25 +87,27 @@ def get_tpu_zones():
     #"us-east1-d",
   ]
 
-import threading
-
-import contextlib
-
 def click_context():
-  import click
-  ctx = click.get_current_context(silent=True)
+  try:
+    import click
+    ctx = click.get_current_context(silent=True)
+  except:
+    ctx = None
   if ctx is None:
     ctx = contextlib.nullcontext()
   return ctx
 
-@ring.lru(expire=15) # seconds
+@ring.lru(expire=15) # cache tpu info for 15 seconds
 def fetch_tpus():
   zones = get_tpu_zones()
   tpus = []
+  lock = threading.RLock()
   ctx = click_context()
   def fetch(zone):
     with ctx:
-      tpus.extend(list_tpus(zone))
+      more = list_tpus(zone)
+      with lock:
+        tpus.extend(more)
   threads = [threading.Thread(target=fetch, args=(zone,), daemon=True) for zone in zones]
   for thread in threads:
     thread.start()
@@ -215,24 +203,30 @@ def nice_since(iso):
   h = (t // 3600) % 24
   d = (t // 86400)
   r = []
-  out = True
+  out = False
   if d > 0 or out:
     out = True
     r += ['{:02d}d'.format(d)]
+  else:
+    r += ['   ']
   if h > 0 or out:
     out = True
     r += ['{:02d}h'.format(h)]
+  else:
+    r += ['   ']
   if m > 0 or out:
     out = True
     r += ['{:02d}m'.format(m)]
+  else:
+    r += ['   ']
   # if s > 0 or out:
   #   out = True
   #   r += ['{:02d}s'.format(s)]
-  return ''.join(r).replace('00d', '   ')
+  return ''.join(r)
 
 def format_headers():
   return {
-    'kind': 'HEADER',
+    'kind': 'header',
     'project': 'PROJECT',
     'zone': 'ZONE',
     'id': 'ID',
@@ -300,8 +294,25 @@ def format_args(tpu):
   r.update(format_widths())
   return r
 
-def format(tpu, spec="{zone:{zone_w}} {index:<{index_w}} {type:{type_w}} {age:{age_w}}  {id:{id_w}} {status:{status_w}} {health:{health_w}} {version:{version_w}} {network:{network_w}} {master:{master_w}} {range:{range_w}} {preemptible!s:{preemptible_w}}", formatter=NamespaceFormatter):
-  #pp(tpu)
+def get_default_format_spec():
+  return ' '.join([
+    "{zone:{zone_w}}",
+    "{index:<{index_w}}",
+    "{type:{type_w}}",
+    "{age:{age_w}}",
+    "{id:{id_w}}",
+    "{status:{status_w}}",
+    "{health:{health_w}}",
+    "{version:{version_w}}",
+    "{network:{network_w}}",
+    "{master:{master_w}}",
+    "{range:{range_w}}",
+    "{preemptible!s:{preemptible_w}}",
+    ])
+
+def format(tpu, spec=None, formatter=NamespaceFormatter):
+  if spec is None:
+    spec = get_default_format_spec()
   if tpu.get('kind', 'tpu') == 'tpu':
     args = format_args(tpu)
   else:
