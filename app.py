@@ -66,14 +66,12 @@ def top():
 def tail():
   watch_status()
 
-@cli.command()
+@cli.command("list")
 @click.option('--zone', type=click.Choice(tpudiepie.tpu.get_tpu_zones()))
 @click.option('--format', type=click.Choice(['text', 'json']), default='text')
 @click.option('-c/-nc', '--color/--no-color', default=True)
-def list(zone, format, color):
+def list_tpus(zone, format, color):
   print_tpus_status(zone=zone, format=format, color=color)
-
-list_tpus = list
 
 def complete_tpu_id(ctx, args, incomplete, zone=None):
   tpus = tpudiepie.get_tpus(zone=zone)
