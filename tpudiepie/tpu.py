@@ -5,13 +5,38 @@ import re
 import ring
 import sys
 import os
+import logging
 from pprint import pprint as pp
 
+logger = logging.getLogger('tpudiepie')
 
-def ero(*args):
-  print(*args, file=sys.stderr)
-  if len(args) > 0:
-    return args[0]
+# create console handler and set level to debug
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+
+# create formatter
+formatter = logging.Formatter('%(asctime)s|%(levelname)s|%(message)s', datefmt='%m-%d-%Y %I:%M:%S%p %Z')
+
+# add formatter to ch
+ch.setFormatter(formatter)
+
+# add ch to logger
+logger.addHandler(ch)
+
+def is_verbose():
+  import click
+  ctx = click.get_current_context(silent=True)
+  if ctx:
+    return ctx.obj['verbose']
+  return False
+
+def ero(x):
+  logger.info('%s', x)
+  return x
+  # if is_verbose():
+  #   print(*args, file=sys.stderr)
+  # if len(args) > 0:
+  #   return args[0]
 
 def build_opt(k, v):
   k = k.replace('__', '#').replace('_', '-').replace('#', '_')
@@ -78,11 +103,24 @@ def get_tpu_zones():
 
 import threading
 
+import contextlib
+
+def click_context():
+  import click
+  ctx = click.get_current_context(silent=True)
+  if ctx is None:
+    ctx = contextlib.nullcontext()
+  return ctx
+
 @ring.lru(expire=15) # seconds
 def fetch_tpus():
   zones = get_tpu_zones()
   tpus = []
-  threads = [threading.Thread(target=lambda zone: tpus.extend(list_tpus(zone)), args=(zone,), daemon=True) for zone in zones]
+  ctx = click_context()
+  def fetch(zone):
+    with ctx:
+      tpus.extend(list_tpus(zone))
+  threads = [threading.Thread(target=fetch, args=(zone,), daemon=True) for zone in zones]
   for thread in threads:
     thread.start()
   for thread in threads:
@@ -102,6 +140,8 @@ def get_tpus(zone=None):
     return [tpu for tpu in tpus if '/{}/'.format(zone) in tpu['name']]
 
 def get_tpu(tpu, zone=None):
+  if isinstance(tpu, dict):
+    tpu = parse_tpu_id(tpu)
   if isinstance(tpu, str) and re.match('^[0-9]+$', tpu):
     tpu = int(tpu)
   if isinstance(tpu, int):
@@ -253,7 +293,7 @@ def parse_tpu_type(tpu):
   return tpu['acceleratorType']
 
 def parse_tpu_description(tpu):
-  return tpu.get('description', '')
+  return tpu.get('description', None)
 
 def format_args(tpu):
   r = _format_args(tpu)
@@ -271,17 +311,41 @@ def format(tpu, spec="{zone:{zone_w}} {index:<{index_w}} {type:{type_w}} {age:{a
   fmt = formatter(args)
   return fmt.format(spec)
 
-def create_tpu_command(tpu):
-  description = parse_tpu_description(tpu)
-  if len(description) <= 0:
-    description = None
+def create_tpu_command(tpu, zone=None, version=None, description=None, preemptible=None):
+  if zone is None:
+    zone = parse_tpu_zone(tpu)
+  if version is None:
+    version = parse_tpu_version(tpu)
+  if description is None:
+    description = parse_tpu_description(tpu)
+  if preemptible is None:
+    preemptible = True if parse_tpu_preemptible(tpu) else None
   return build_commandline("gcloud compute tpus create",
                            parse_tpu_id(tpu),
-                           zone=parse_tpu_zone(tpu),
+                           zone=zone,
                            network=parse_tpu_network(tpu),
                            range=parse_tpu_range(tpu),
-                           version=parse_tpu_version(tpu),
+                           version=version,
                            accelerator_type=parse_tpu_type(tpu),
-                           preemptible=True if parse_tpu_preemptible(tpu) else None,
+                           preemptible=preemptible,
                            description=description,
+                           )
+
+def delete_tpu_command(tpu, zone=None):
+  if zone is None:
+    zone = parse_tpu_zone(tpu)
+  return build_commandline("gcloud compute tpus delete",
+                           parse_tpu_id(tpu),
+                           zone=zone,
+                           quiet=True,
+                           )
+
+def reimage_tpu_command(tpu, version=None):
+  if version is None:
+    version = parse_tpu_version(tpu)
+  return build_commandline("gcloud compute tpus reimage",
+                           parse_tpu_id(tpu),
+                           zone=parse_tpu_zone(tpu),
+                           version=version,
+                           quiet=True,
                            )
