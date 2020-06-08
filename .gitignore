@@ -1,3 +1,7 @@
 __pycache__
 /.idea
 /venv/
+*.egg-info
+perf.log
+perf.svg
+/build/

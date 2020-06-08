@@ -101,13 +101,11 @@ def click_context():
 def fetch_tpus():
   zones = get_tpu_zones()
   tpus = []
-  lock = threading.RLock()
   ctx = click_context()
   def fetch(zone):
     with ctx:
       more = list_tpus(zone)
-      with lock:
-        tpus.extend(more)
+      tpus.extend(more)
   threads = [threading.Thread(target=fetch, args=(zone,), daemon=True) for zone in zones]
   for thread in threads:
     thread.start()

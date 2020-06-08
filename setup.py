@@ -38,12 +38,13 @@ setuptools.setup(
         'Click>=7.1.2',
         'six>=1.11.0',
         'ring>=0.7.3',
+        'moment>=0.0.10',
     ],
     packages=packages,
     entry_points={
         "console_scripts": [
-            "{} = {}.main:program.main".format(package_name, package_name),
-            "{} = {}.main:program.main".format(binary_name, package_name),
+            "{} = {}.program:cli".format(package_name, package_name),
+            "{} = {}.program:cli".format(binary_name, package_name),
         ]
     },
     classifiers=[
