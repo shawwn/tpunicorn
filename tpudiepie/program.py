@@ -200,6 +200,9 @@ def recreate(tpu, zone, version, yes, dry_run):
     tpudiepie.tpu.parse_tpu_id(tpu),
     'would be' if dry_run else 'is'))
 
+def main(*args, prog_name='tpudiepie', auto_envvar_prefix='TPUDIEPIE', **kws):
+  cli.main(*args, prog_name=prog_name, auto_envvar_prefix=auto_envvar_prefix, **kws)
+
 if __name__ == "__main__":
-  cli.main(prog_name='tpudiepie', auto_envvar_prefix='TPUDIEPIE')
+  main()
 
