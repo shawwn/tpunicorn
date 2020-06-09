@@ -8,6 +8,7 @@ import os
 import logging
 import threading
 import contextlib
+import time
 from pprint import pprint as pp
 
 logger = logging.getLogger('tpudiepie')
@@ -97,8 +98,109 @@ def click_context():
     ctx = contextlib.nullcontext()
   return ctx
 
+
+services = dict()
+
+def get_service(key, name, version, recreate=False, execute=None, max_attempts=5, retry_delay=10.0, **kws):
+  logging.info('here')
+  while max_attempts > 0 or max_attempts < 0:
+    if recreate:
+      del services[key]
+    if key not in services:
+      services[key] = googleapiclient.discovery.build(name, version, cache_discovery=False, **kws)
+    service = services[key]
+    if callable(execute):
+      try:
+        return execute(service).execute()
+      except OSError:
+        import traceback
+        traceback.print_exc()
+        max_attempts -= 1
+        time.sleep(retry_delay)
+        recreate = True
+    else:
+      return service
+
+def execute(service, resource, max_attempts=5):
+  service = service()
+  while max_attempts > 0 or max_attempts < 0:
+    try:
+      return resource(service).execute()
+    except OSError:
+      max_attempts -= 1
+      time.sleep(10.0)
+      service = service(recreate=True)
+
+
+def get_default_project():
+  import gcloud
+  import gcloud.client
+  return gcloud._helpers._determine_default_project()
+
+from google.oauth2 import service_account
+import googleapiclient.discovery
+
+def fetch_all_tpus(project=None, zones=None, service=None):
+  logging.info('here')
+  if project is None:
+    project = get_default_project()
+  if zones is None:
+    zones = get_tpu_zones()
+  #if service is None:
+  #  service = get_service('tpu', 'tpu', 'v1')
+
+  tpus = []
+
+  def callback(request_id, response, exception):
+    if exception is not None:
+      logging.error('Got exception while fetching TPUs: %s', exception)
+    else:
+      results.append(response)
+
+  #batch = service.new_batch_http_request()
+
+  #cmds = [service.projects().locations().nodes().list(parent='projects/{}/locations/{}'.format(project, zone)) for zone in zones]
+  #batch.add(cmd, callback=callback)
+  ctx = click_context()
+  lock = threading.RLock()
+  def fetch(project, zone):
+    try:
+      #with ctx:
+      parent='projects/{}/locations/{}'.format(project, zone)
+      #print('parent=%r' % parent)
+      #logging.info('parent=%r', parent)
+      if service is None:
+        api = googleapiclient.discovery.build('tpu', 'v1', cache_discovery=False)
+      else:
+        api = service
+      cmd = api.projects().locations().nodes().list(parent=parent)
+      #more = list_tpus(zone)
+      #with lock:
+      results = cmd.execute()
+      #print('parent=%r results=%r' % (parent, results))
+      nodes = results.get('nodes', [])
+      #with lock:
+      tpus.extend(nodes)
+    except:
+      import traceback
+      traceback.print_exc()
+  logging.info('here')
+  threads = [threading.Thread(target=fetch, args=(project, zone,), daemon=True) for zone in zones]
+  for thread in threads:
+    thread.start()
+  for thread in threads:
+    thread.join()
+
+  #batch.execute()
+  time.sleep(4.0)
+
+  return tpus
+
+
+
 @ring.lru(expire=15) # cache tpu info for 15 seconds
 def fetch_tpus():
+  return fetch_all_tpus()
   zones = get_tpu_zones()
   tpus = []
   ctx = click_context()
