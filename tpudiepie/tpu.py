@@ -146,6 +146,12 @@ def get_tpus(zone=None):
   else:
     return [tpu for tpu in tpus if '/{}/'.format(zone) in tpu['name']]
 
+class TPUNotUniqueError(ValueError):
+  pass
+
+class TPUNotFoundError(ValueError):
+  pass
+
 def get_tpu(tpu, zone=None):
   if isinstance(tpu, dict):
     tpu = parse_tpu_id(tpu)
@@ -158,9 +164,9 @@ def get_tpu(tpu, zone=None):
     which = 'id'
     tpus = [x for x in get_tpus(zone=zone) if parse_tpu_id(x) == tpu]
   if len(tpus) > 1:
-    raise ValueError("Multiple TPUs matched {} {!r}. Try specifying --zone".format(which, tpu))
+    raise TPUNotUniqueError("Multiple TPUs matched {} {!r}. Try specifying --zone".format(which, tpu))
   if len(tpus) <= 0:
-    raise ValueError("No TPUs matched {} {!r}".format(which, tpu))
+    raise TPUNotFoundError("No TPUs matched {} {!r}".format(which, tpu))
   return tpus[0]
 
 from string import Formatter

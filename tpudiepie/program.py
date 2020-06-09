@@ -38,11 +38,11 @@ def print_tpu_status(tpu, color=True):
     health = tpudiepie.format(tpu, '{health}')
     if status == 'READY' and health == 'HEALTHY':
       click.secho(message, fg='green')
-      return 'HEALTHY'
     elif status == 'PREEMPTED':
       click.secho(message, fg='red')
     else:
       click.secho(message, fg='yellow')
+    return status, health
 
 def print_tpus_status(zone=None, format='text', color=True):
   tpus = tpudiepie.get_tpus(zone=zone)
@@ -68,11 +68,11 @@ def top():
 def tail():
   watch_status()
 
-@cli.command("list")
+@cli.command()
 @click.option('--zone', type=click.Choice(tpudiepie.tpu.get_tpu_zones()))
 @click.option('--format', type=click.Choice(['text', 'json']), default='text')
 @click.option('-c/-nc', '--color/--no-color', default=True)
-def list_tpus(zone, format, color):
+def status(zone, format, color):
   print_tpus_status(zone=zone, format=format, color=color)
 
 def complete_tpu_id(ctx, args, incomplete, zone=None):
@@ -87,29 +87,68 @@ def complete_tpu_id(ctx, args, incomplete, zone=None):
 #   create = tpudiepie.create_tpu_command(tpu)
 #   click.echo(create)
 
-def check_healthy(tpu, zone=None, color=True):
+def check_healthy(tpu, zone=None, color=True, noisy=False):
   tpu = tpudiepie.get_tpu(tpu, zone=zone)
-  print_tpu_status(tpu, color=color)
+  if noisy:
+    print_tpu_status_headers()
+    print_tpu_status(tpu, color=color)
   status = tpudiepie.format(tpu, '{status}')
   health = tpudiepie.format(tpu, '{health}')
   if status == 'READY' and health == 'HEALTHY':
-    return True
-  return False
+    return True, tpu
+  return False, tpu
 
-def wait_healthy(tpu, zone=None, color=True):
+@cli.command()
+@click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
+@click.option('--zone', type=click.Choice(tpudiepie.tpu.get_tpu_zones()))
+@click.option('-c/-nc', '--color/--no-color', default=True)
+@click.option('-y', '--yes', is_flag=True)
+@click.option('--dry-run', is_flag=True)
+@click.option('--delete-after-minutes', type=click.FLOAT, default=15.0)
+@click.pass_context
+def wait_healthy(ctx, tpu, zone, color, yes, dry_run, delete_after_minutes, **kws):
+  ok, tpu = check_healthy(tpu, color=color, noisy=True)
+  if ok:
+    return True
+  started = time.time()
   while True:
-    if check_healthy(tpu, color=color):
-      return
-    click.echo('TPU {} not yet healthy; waiting 30 seconds...'.format(tpudiepie.tpu.parse_tpu_id(tpu)))
-    time.sleep(30.0)
+    elapsed = time.time() - started
+    remain = 30.0
+    if delete_after_minutes is not None and delete_after_minutes > 0.0:
+      remain = delete_after_minutes*60 - elapsed
+      remain_min = int(remain // 60)
+      remain_sec = int(remain % 60)
+      click.echo('TPU {} not yet healthy; {:02d}m{:02d}s until I delete and recreate it...'.format(tpudiepie.tpu.parse_tpu_id(tpu), remain_min, remain_sec))
+    else:
+      click.echo('TPU {} not yet healthy...'.format(tpudiepie.tpu.parse_tpu_id(tpu)))
+    time.sleep(min(remain, 30.0) + 1.0)
+    elapsed = time.time() - started
+    if delete_after_minutes is not None and elapsed/60 >= delete_after_minutes:
+      do_step("It's been {} minutes and the TPU still isn't healthy; recreating it.".format(delete_after_minutes))
+      return ctx.forward(recreate, yes=True, **kws)
+    try:
+      ok, _ = check_healthy(tpu, color=color, noisy=True)
+      if ok:
+        return True
+    except tpudiepie.tpu.TPUNotFoundError:
+      click.secho('TPU {} not found. (Was it deleted by someone else?) Recreating it...'.format(tpudiepie.tpu.parse_tpu_id(tpu)), bold=True)
+      assert isinstance(tpu, dict)
+      create = tpudiepie.create_tpu_command(tpu, zone=zone)
+      do_step('Creating TPU...', create)
+      started = time.time() # reset deletion countdown
+      continue
+  raise Exception('Should not get here')
+
+def print_shell(command):
+  click.echo('  $ ', nl=False)
+  click.secho(command, fg='blue', bold=True)
 
 def print_step(label=None, command=None, args=(), kwargs={}):
   click.echo('')
   if label is not None:
     click.secho(label, bold=True)
   if command is not None and not callable(command):
-    click.echo('  $ ', nl=False)
-    click.secho(command, fg='blue', bold=True)
+    print_shell(command)
 
 def do_step(label=None, command=None, dry_run=False, delay_after=1.0, args=(), kwargs={}):
   print_step(label=label, command=command, args=args, kwargs=kwargs)
@@ -130,7 +169,8 @@ def do_step(label=None, command=None, dry_run=False, delay_after=1.0, args=(), k
 @click.option('--version', type=click.STRING)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
-def delete(tpu, zone, version, yes, dry_run):
+@click.pass_context
+def delete(ctx, tpu, zone, version, yes, dry_run, **kws):
   tpu = tpudiepie.get_tpu(tpu=tpu, zone=zone)
   click.echo('Current status of TPU:')
   print_tpu_status_headers()
@@ -139,9 +179,10 @@ def delete(tpu, zone, version, yes, dry_run):
   delete = tpudiepie.delete_tpu_command(tpu, zone=zone)
   create = tpudiepie.create_tpu_command(tpu, zone=zone, version=version)
   def wait():
-    wait_healthy(tpu, zone=zone)
+    ctx.forward(wait_healthy, tpu=tpu, **kws)
   if not yes:
     print_step('Step 1: delete TPU.', delete)
+    click.echo('')
     if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
       return
   do_step('Step 1: delete TPU...', delete, dry_run=dry_run)
@@ -157,14 +198,16 @@ def delete(tpu, zone, version, yes, dry_run):
 @click.option('--version', type=click.STRING)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
-def reimage(tpu, zone, version, yes, dry_run):
+@click.pass_context
+def reimage(ctx, tpu, zone, version, yes, dry_run, **kws):
   tpu = tpudiepie.get_tpu(tpu=tpu, zone=zone)
   reimage = tpudiepie.reimage_tpu_command(tpu, version=version)
   def wait():
-    wait_healthy(tpu, zone=zone)
+    ctx.forward(wait_healthy, tpu=tpu, **kws)
   if not yes:
     print_step('Step 1: reimage TPU.', reimage)
     print_step('Step 2: wait until TPU is HEALTHY.', wait)
+    click.echo('')
     if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
       return
   do_step('Step 1: reimage TPU...', reimage, dry_run=dry_run)
@@ -177,22 +220,33 @@ def reimage(tpu, zone, version, yes, dry_run):
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 @click.option('--zone', type=click.Choice(tpudiepie.tpu.get_tpu_zones()))
 @click.option('--version', type=click.STRING)
+@click.option('-c/-nc', '--color/--no-color', default=True)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
-def recreate(tpu, zone, version, yes, dry_run):
+@click.option('--ensure', is_flag=True, help="If TPU is healthy, don't do anything.")
+@click.option('--delete-after-minutes', type=click.FLOAT, default=15.0)
+@click.pass_context
+def recreate(ctx, tpu, zone, version, color, yes, dry_run, ensure, delete_after_minutes, **kws):
   tpu = tpudiepie.get_tpu(tpu=tpu, zone=zone)
-  click.echo('Current status of TPU:')
-  print_tpu_status_headers()
-  print_tpu_status(tpu)
-  click.echo('')
-  delete = tpudiepie.delete_tpu_command(tpu, zone=zone)
-  create = tpudiepie.create_tpu_command(tpu, zone=zone, version=version)
+  print_tpu_status_headers(color=color)
+  status, health = print_tpu_status(tpu, color=color)
+  if ensure and status == 'READY' and health == 'HEALTHY':
+    return 0
+  if ensure and status in ['CREATING', 'STARTING', 'RESTARTING', 'REIMAGING', 'DELETING', 'STOPPING']:
+    return 1
+  else:
+    if health not in ['UNHEALTHY_TENSORFLOW']:
+      delete = tpudiepie.delete_tpu_command(tpu, zone=zone)
+    else:
+      delete = None
+    create = tpudiepie.create_tpu_command(tpu, zone=zone, version=version)
   def wait():
-    wait_healthy(tpu, zone=zone)
+    ctx.forward(wait_healthy, tpu=tpu, **kws)
   if not yes:
     print_step('Step 1: delete TPU.', delete)
     print_step('Step 2: create TPU.', create)
     print_step('Step 3: wait until TPU is HEALTHY.', wait)
+    click.echo('')
     if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
       return
   do_step('Step 1: delete TPU...', delete, dry_run=dry_run)
@@ -201,6 +255,21 @@ def recreate(tpu, zone, version, yes, dry_run):
   click.echo('TPU {} {} ready for training.'.format(
     tpudiepie.tpu.parse_tpu_id(tpu),
     'would be' if dry_run else 'is'))
+
+@cli.command()
+@click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
+@click.option('--zone', type=click.Choice(tpudiepie.tpu.get_tpu_zones()))
+@click.option('--version', type=click.STRING)
+@click.option('-y', '--yes', is_flag=True)
+@click.option('--dry-run', is_flag=True)
+@click.option('--forever', is_flag=True)
+@click.pass_context
+def ensure(ctx, tpu, zone, version, yes, dry_run, forever, **kws):
+  while True:
+    ctx.forward(recreate, ensure=True, **kws)
+    if not forever:
+      break
+    time.sleep(30.0)
 
 completions = {
   'bash': {
@@ -253,6 +322,7 @@ def install_completion(shell, yes, dry_run):
   if not yes:
     for label, command, args, kwargs in tasks:
       print_step(label, command, args, kwargs)
+    click.echo('')
     if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
       return
   for label, command, args, kwargs in tasks:
