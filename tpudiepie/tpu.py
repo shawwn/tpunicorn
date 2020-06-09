@@ -98,8 +98,11 @@ def click_context():
   return ctx
 
 @ring.lru(expire=15) # cache tpu info for 15 seconds
-def fetch_tpus():
-  zones = get_tpu_zones()
+def fetch_tpus(zone=None):
+  if zone is None:
+    zones = get_tpu_zones()
+  if isinstance(zone, str):
+    zones = zone.split(',')
   tpus = []
   ctx = click_context()
   def fetch(zone):
@@ -119,7 +122,7 @@ def list_tpus(zone):
   return list(sorted(tpus, key=parse_tpu_index))
 
 def get_tpus(zone=None):
-  tpus = fetch_tpus()
+  tpus = fetch_tpus(zone=zone)
   if zone is None:
     return tpus
   else:
