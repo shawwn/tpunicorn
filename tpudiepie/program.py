@@ -10,6 +10,8 @@ import logging as pylogging
 logging = tpudiepie.logger
 logging.setLevel(pylogging.WARNING)
 
+from tpudiepie._version import binary_names
+
 @click.group()
 @click.option('-v', '--verbose', is_flag=True)
 @click.pass_context
@@ -101,7 +103,7 @@ def wait_healthy(tpu, zone=None, color=True):
     click.echo('TPU {} not yet healthy; waiting 30 seconds...'.format(tpudiepie.tpu.parse_tpu_id(tpu)))
     time.sleep(30.0)
 
-def print_step(label=None, command=None):
+def print_step(label=None, command=None, args=(), kwargs={}):
   click.echo('')
   if label is not None:
     click.secho(label, bold=True)
@@ -109,15 +111,15 @@ def print_step(label=None, command=None):
     click.echo('  $ ', nl=False)
     click.secho(command, fg='blue', bold=True)
 
-def do_step(label=None, command=None, dry_run=False, delay_after=1.0):
-  print_step(label=label, command=command)
+def do_step(label=None, command=None, dry_run=False, delay_after=1.0, args=(), kwargs={}):
+  print_step(label=label, command=command, args=args, kwargs=kwargs)
   if command is not None:
     if dry_run:
       click.echo('Dry run; command skipped.')
       time.sleep(3.0)
     else:
       if callable(command):
-        command()
+        command(*args, **kwargs)
       else:
         os.system(command)
       time.sleep(delay_after)
@@ -199,6 +201,62 @@ def recreate(tpu, zone, version, yes, dry_run):
   click.echo('TPU {} {} ready for training.'.format(
     tpudiepie.tpu.parse_tpu_id(tpu),
     'would be' if dry_run else 'is'))
+
+completions = {
+  'bash': {
+    'script': 'eval "$(_{}_COMPLETE=source_bash {})"',
+    'file': '~/.bash_profile' if sys.platform == 'darwin' else '~/.bashrc',
+  },
+  'zsh': {
+    'script': 'eval "$(_{}_COMPLETE=source_zsh {})"',
+    'file': '~/.zshrc',
+  },
+  'fish': {
+    'script': 'eval (env _{}_COMPLETE=source_fish {})',
+    'file': '~/.config/fish/completions/{}.fish',
+  }
+}
+
+@cli.command()
+@click.argument('shell', type=click.Choice(completions.keys()))
+@click.option('-y', '--yes', is_flag=True)
+@click.option('--dry-run', is_flag=True)
+def install_completion(shell, yes, dry_run):
+  def install_completion(path, script, name):
+    try:
+      with click.open_file(path) as f:
+        contents = f.read()
+    except FileNotFoundError:
+      contents = ''
+    if script in contents:
+      click.echo('Completion script {} already installed; skipping'.format(name))
+      return
+    if len(contents) > 0 and not contents.endswith('\n'):
+      contents += '\n'
+    contents += script + '\n'
+    if dry_run:
+      click.secho('Dry run; not writing. Would have appended to {} the following text:'.format(path), bold=True)
+      click.echo(script)
+    else:
+      with click.open_file(path, 'w', atomic=True) as f:
+        f.write(contents)
+      click.secho('{} completion installed for `{}`'.format(shell, name), bold=True)
+  scripts = [completions[shell]['script'].format(binary.upper().replace('-', ''), binary) for binary in binary_names]
+  filename = os.path.expanduser(completions[shell]['file'])
+  tasks = []
+  for script, name in zip(scripts, binary_names):
+    path = filename
+    if '{}' in path:
+      path = path.format(name)
+    tasks.append(['Step {}: Append the completion script for {} to {}'.format(len(tasks)+1, name, path),
+        install_completion, (path, script, name), {}])
+  if not yes:
+    for label, command, args, kwargs in tasks:
+      print_step(label, command, args, kwargs)
+    if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
+      return
+  for label, command, args, kwargs in tasks:
+    do_step(label + '..', command, args=args, kwargs=kwargs)
 
 def main(*args, prog_name='tpudiepie', auto_envvar_prefix='TPUDIEPIE', **kws):
   cli.main(*args, prog_name=prog_name, auto_envvar_prefix=auto_envvar_prefix, **kws)

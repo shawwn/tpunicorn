@@ -4,7 +4,6 @@ import setuptools
 import os
 
 package_name = "tpudiepie"
-binary_name = "die"
 packages = setuptools.find_packages(
     include=[package_name, "{}.*".format(package_name)]
 )
@@ -43,8 +42,8 @@ setuptools.setup(
     packages=packages,
     entry_points={
         "console_scripts": [
-            "{} = {}.program:cli".format(package_name, package_name),
-            "{} = {}.program:cli".format(binary_name, package_name),
+            "{} = {}.program:cli".format(binary_name, package_name)
+            for binary_name in binary_names
         ]
     },
     classifiers=[
