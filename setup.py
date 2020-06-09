@@ -13,6 +13,7 @@ _locals = {}
 with open(os.path.join(package_name, "_version.py")) as fp:
     exec(fp.read(), None, _locals)
 version = _locals["__version__"]
+binary_names = _locals["binary_names"]
 
 # Frankenstein long_description: changelog note + README
 long_description = """
