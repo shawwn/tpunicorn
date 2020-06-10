@@ -192,6 +192,26 @@ def _normalize_tpu_isodate(iso):
   raise ValueError("Could not parse TPU date {!r}".format(iso))
 
 import moment
+import datetime
+import time
+
+def get_timestamp(timestamp=None, utc=True):
+  if timestamp is None:
+    timestamp = time.time()
+  # https://stackoverflow.com/a/52606421/9919772
+  #dt = datetime.datetime.fromtimestamp(timestamp).astimezone()
+  dt = moment.unix(timestamp, utc=utc)
+  dt = dt.timezone(current_tzname())
+  return dt.strftime("%m-%d-%Y %I:%M:%S%p %Z")
+
+def current_timezone():
+  if time.daylight:
+    return datetime.timezone(datetime.timedelta(seconds=-time.altzone),time.tzname[1])
+  else:
+    return datetime.timezone(datetime.timedelta(seconds=-time.timezone),time.tzname[0])
+
+def current_tzname():
+  return current_timezone().tzname(None)
 
 def since(iso):
   dt = moment.utcnow() - moment.utc(_normalize_tpu_isodate(iso), "%Y-%m-%dT%H:%M:%S.%fZ")

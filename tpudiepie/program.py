@@ -202,7 +202,7 @@ def reimage(tpu, zone, version, yes, dry_run):
 @click.option('-p', '--preempted', is_flag=True)
 def recreate(tpu, zone, version, yes, dry_run, preempted):
   tpu = tpudiepie.get_tpu(tpu=tpu, zone=zone)
-  click.echo('Current status of TPU {}:'.format(tpudiepie.tpu.parse_tpu_id(tpu)))
+  click.echo('Current status of TPU {} as of {}:'.format(tpudiepie.tpu.parse_tpu_id(tpu), tpudiepie.tpu.get_timestamp()))
   print_tpu_status_headers()
   print_tpu_status(tpu)
   if preempted and not is_preempted(tpu, zone=zone):
