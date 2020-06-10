@@ -87,9 +87,15 @@ def complete_tpu_id(ctx, args, incomplete, zone=None):
 #   create = tpudiepie.create_tpu_command(tpu)
 #   click.echo(create)
 
-def check_healthy(tpu, zone=None, color=True):
+def is_preempted(tpu, zone=None):
   tpu = tpudiepie.get_tpu(tpu, zone=zone)
-  print_tpu_status(tpu, color=color)
+  status = tpudiepie.format(tpu, '{status}')
+  return status == 'PREEMPTED'
+
+def check_healthy(tpu, zone=None, color=True, noisy=True):
+  tpu = tpudiepie.get_tpu(tpu, zone=zone)
+  if noisy:
+    print_tpu_status(tpu, color=color)
   status = tpudiepie.format(tpu, '{status}')
   health = tpudiepie.format(tpu, '{health}')
   if status == 'READY' and health == 'HEALTHY':
@@ -179,11 +185,14 @@ def reimage(tpu, zone, version, yes, dry_run):
 @click.option('--version', type=click.STRING)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
-def recreate(tpu, zone, version, yes, dry_run):
+@click.option('-p', '--preempted', is_flag=True)
+def recreate(tpu, zone, version, yes, dry_run, preempted):
   tpu = tpudiepie.get_tpu(tpu=tpu, zone=zone)
-  click.echo('Current status of TPU:')
+  click.echo('Current status of TPU {}:'.format(tpudiepie.tpu.parse_tpu_id(tpu)))
   print_tpu_status_headers()
   print_tpu_status(tpu)
+  if preempted and not is_preempted(tpu, zone=zone):
+    return
   click.echo('')
   delete = tpudiepie.delete_tpu_command(tpu, zone=zone)
   create = tpudiepie.create_tpu_command(tpu, zone=zone, version=version)
