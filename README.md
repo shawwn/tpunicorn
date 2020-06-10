@@ -31,76 +31,33 @@ see the [Troubleshooting](#troubleshooting) section.
 
 ## Examples
 
-### Watching your TPUs
+### Seeing your TPUs
 
 `pu list` shows your TPUs.
 
 ![image](https://user-images.githubusercontent.com/59632/84264053-622b9200-aad5-11ea-9a8d-9bd8c78c856b.png)
 
-If your TPU's name ends with a number, that's its `INDEX`. Rather than
-specifying the full name of the TPU, you can refer to the TPU by its
-`INDEX` on the command line. If two TPUs have the same index, an error
-is thrown if you attempt to refer to either of them by `INDEX` (since
-it would be ambiguous).
+The `INDEX` is determined by checking whether your TPU name ends with
+a number. It's common to create TPUs named like `tpu1`, `tpu2`, etc.
+If you use such a naming scheme, the number becomes its `INDEX` and
+you can refer to the TPU by number via the command line, which is far
+easier than typing out the whole name.
 
-### Watching your TPUs continuously
+(If two TPUs have the same index, an error is thrown if you attempt to
+refer to either of them by number, since that would be ambiguous.)
+
+### Seeing your TPUs continuously
 
 `pu top` is like `htop` for TPUs. Every few seconds, it clears the
 screen and runs `pu list`, i.e. it shows you the current status of all
 your TPUs. Use Ctrl-C to quit.
 
-### Babysitting a preemptible TPU
-
-`pu babysit <TPU>` will watch the specified TPU. If it preempts, it
-recreates the TPU automatically. You can specify commands to be run
-once the TPU has been recreated (and its health is `HEALTHY`) by
-passing by passing `-c <command>`. To run multiple commands, pass
-multiple `-c <command>` options.
-
-In a terminal, simulate a training session:
-```sh
-while true
-do
-  bash -c 'echo My Training Session; sleep 10000'
-  echo restarted
-  sleep 1
-done
-```
-
-In a separate terminal, babysit a TPU. Whenever the TPU preempts,
-this command does the following:
-
-- recreates the TPU
-- waits for the TPU's health to become `HEALTHY`
-- kills our simulated training session
-
-```sh
-pu babysit my-tpu -c 'pkill -9 -f "My Training Session"'
-```
-
-You'll notice the simulated training session prints "restarted",
-indicating that the kill was successful and the training process was
-restarted.
-
-In a real-world scenario, be sure that the pkill command only kills
-one specific instance of your training script. For example, if
-you run multiple training sessions with a script named `train.py`
-using different `TPU_NAME` environment vars, a naive `pkill` command
-like `pkill -f train.py` would kill both training sessions, rather
-than the one associated with the TPU. 
-
-(To solve that, I normally pass the TPU name as a command-line
-argument, then run `pkill -9 -f <TPU>`.)
-
-Also, be sure to pass `pkill -9` rather than `pkill`. That way, your
-training session will be restarted even if it's frozen.
-
 ### Recreating a TPU
 
-`pu recreate <TPU>` recreates an existing TPU, then waits for the
-TPU's health to become `HEALTHY`. You can run commands after the TPU
-is successfully recreated by passing `-c <command>`. To run multiple
-commands, pass multiple `-c <command>` options.
+`pu recreate <TPU>` recreates an existing TPU, waits for the TPU's
+health to become `HEALTHY`, then runs the commands specified via `-c
+<command>`. To run multiple commands, pass multiple `-c <command>`
+options.
 
 ```sh
 # Recreate a TPU named foo
@@ -109,8 +66,9 @@ pu recreate foo
 
 ```sh
 # Recreate a TPU named foo, but only if it's PREEMPTED. Don't prompt
-for confirmation. Run a comand after recreating.
-pu recreate foo --preempted --yes -c 'echo This only runs after recreating'
+# for confirmation. After the TPU recreates and is HEALTHY, run a
+# command.
+pu recreate foo --preempted --yes -c 'echo This only runs after the TPU is HEALTHY'
 ```
 
 ```sh
@@ -125,6 +83,71 @@ do
   sleep 30
 done
 ```
+
+### Babysitting a preemptible TPU
+
+`pu babysit <TPU>` will watch the specified TPU, recreating it
+whenever it preempts. You can specify commands to run afterwards by
+passing by passing `-c <command>`. (For example, a command to kill
+your current training session, or send you a message.) To run multiple
+commands, pass multiple `-c <command>` options.
+
+In a terminal, simulate a training session:
+```sh
+while true
+do
+  bash -c 'echo My Training Session; sleep 10000'
+  echo restarting
+  sleep 1
+done
+```
+
+In a separate terminal, babysit a TPU:
+
+```sh
+pu babysit my-tpu -c 'pkill -9 -f "My Training Session"'
+```
+Whenever the TPU preempts, that command will:
+- recreate the TPU named `my-tpu`
+- wait for the TPU's health to become `HEALTHY`
+- kill our simulated training session
+
+The simulated training session will echo "restarting", indicating that
+it was successfully killed and the training process restarted itself.
+
+In a real-world scenario, be sure that the pkill command only kills
+one specific instance of your training script. For example, if
+you run multiple training sessions with a script named `train.py`
+using different `TPU_NAME` environment vars, a naive `pkill` command
+like `pkill -f train.py` would kill all of your training sessions,
+rather than the one associated with the TPU. 
+
+(To solve that, I normally pass the TPU name as a command-line
+argument, then run `pkill -9 -f <TPU>`.)
+
+Also, be sure to pass `pkill -9` rather than `pkill`. That way, your
+training session will be restarted even if it's frozen.
+
+Lastly, consider running your actual training script like so:
+
+```
+while true
+do
+  timeout --signal=SIGKILL 5h <your training command>
+  echo restarting
+  sleep 30
+done
+```
+
+This will force-kill your training command after a maximum of
+5 hours of training. Meaning, if your training session freezes
+for some reason (e.g. the TPU gets into a bad state, which is
+surprisingly common) then you'll lose no more than a few hours
+of training time.
+
+Without this, we kept running into situations like "wake up the
+next day and discover that the training session had been frozen
+for the last 12 hours, requiring a manual TPU restart."
 
 ### Listing TPUs
 
