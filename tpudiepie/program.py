@@ -236,6 +236,29 @@ def recreate(tpu, zone, version, yes, dry_run, preempted, command, **kws):
     tpudiepie.tpu.parse_tpu_id(tpu),
     'would be' if dry_run else 'is'))
 
+@cli.command()
+@click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
+@click.option('--zone', type=click.Choice(tpudiepie.tpu.get_tpu_zones()))
+@click.option('--dry-run', is_flag=True)
+@click.option('-i', '--interval', type=click.INT, default=30, metavar='<seconds>',
+              help='How often to check the TPU. (default: 30 seconds)')
+@click.option('-c', '--command', type=click.STRING, multiple=True,
+              help="After the TPU has been recreated and is HEALTHY, run this command."
+                   "(Useful for killing a training session after the TPU has been recreated.)")
+@click.pass_context
+def babysit(ctx, tpu, zone, dry_run, interval, command):
+  """Checks TPU every INTERVAL seconds. Recreates the TPU if (and only if) the tpu has preempted."""
+  # cmd = cli.get_command(ctx, 'babysit')
+  # ctx = click.Context(cmd, parent=ctx, ignore_unknown_options=True)
+  ctx.forward(recreate, yes=True, preempted=True)
+  while True:
+    time.sleep(interval)
+    try:
+      ctx.forward(recreate, yes=True, preempted=True)
+    except:
+      import traceback
+      traceback.print_exc()
+
 completions = {
   'bash': {
     'script': 'eval "$(_{}_COMPLETE=source_bash {})"',
