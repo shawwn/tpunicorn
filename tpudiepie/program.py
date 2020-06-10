@@ -199,8 +199,13 @@ def reimage(tpu, zone, version, yes, dry_run):
 @click.option('--version', type=click.STRING)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
-@click.option('-p', '--preempted', is_flag=True)
-def recreate(tpu, zone, version, yes, dry_run, preempted):
+@click.option('-p', '--preempted', is_flag=True,
+              help="Only recreate TPU if it has preempted."
+                   """(Specifically, if the tpu's STATE is "PREEMPTED",proceed; otherwise do nothing.)""")
+@click.option('-c', '--command', type=click.STRING, multiple=True,
+              help="After the TPU is HEALTHY, run this command."
+              "(Useful for killing a training session after the TPU has been recreated.)")
+def recreate(tpu, zone, version, yes, dry_run, preempted, command, **kws):
   tpu = tpudiepie.get_tpu(tpu=tpu, zone=zone)
   click.echo('Current status of TPU {} as of {}:'.format(tpudiepie.tpu.parse_tpu_id(tpu), tpudiepie.tpu.get_timestamp()))
   print_tpu_status_headers()
@@ -216,11 +221,17 @@ def recreate(tpu, zone, version, yes, dry_run, preempted):
     print_step('Step 1: delete TPU.', delete)
     print_step('Step 2: create TPU.', create)
     print_step('Step 3: wait until TPU is HEALTHY.', wait)
+    if len(command) > 0:
+      for i, cmd in enumerate(command):
+        print_step('Step {}: run this command:'.format(i+4), cmd)
     if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
       return
   do_step('Step 1: delete TPU...', delete, dry_run=dry_run)
   do_step('Step 2: create TPU...', create, dry_run=dry_run)
   do_step('Step 3: wait for TPU to become HEALTHY...', wait, dry_run=dry_run)
+  if len(command) > 0:
+    for i, cmd in enumerate(command):
+      do_step('Step {}: running command...'.format(i+4), cmd, dry_run=dry_run)
   click.echo('TPU {} {} ready for training.'.format(
     tpudiepie.tpu.parse_tpu_id(tpu),
     'would be' if dry_run else 'is'))
