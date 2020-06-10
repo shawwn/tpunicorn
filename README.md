@@ -133,10 +133,10 @@ done
 ### Babysitting a preemptible TPU
 
 `pu babysit <TPU>` will watch the specified TPU, recreating it
-whenever it preempts. You can specify commands to run afterwards by
-passing by passing `-c <command>`. (For example, a command to kill
-your current training session, or send you a message.) To run multiple
-commands, pass multiple `-c <command>` options.
+whenever it preempts. You can specify commands to run afterwards via
+`-c <command>`. (For example, a command to kill your current training
+session, or send you a message.) To run multiple commands, pass
+multiple `-c <command>` options.
 
 In a terminal, simulate a training session:
 ```sh
