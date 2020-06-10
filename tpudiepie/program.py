@@ -29,7 +29,10 @@ def print_tpu_status_headers(color=True):
   else:
     click.echo(message)
 
-def print_tpu_status(tpu, color=True):
+def print_tpu_status(tpu, format='text', color=True):
+  if format == 'json':
+    click.echo(json.dumps(tpu))
+    return
   message = tpudiepie.format(tpu)
   if not color:
     click.echo(message)
@@ -72,8 +75,19 @@ def tail():
 @click.option('--zone', type=click.Choice(tpudiepie.tpu.get_tpu_zones()))
 @click.option('--format', type=click.Choice(['text', 'json']), default='text')
 @click.option('-c/-nc', '--color/--no-color', default=True)
-def list_tpus(zone, format, color):
-  print_tpus_status(zone=zone, format=format, color=color)
+@click.option('-t', '--tpu', type=click.STRING, help="List a specific TPU by id.", multiple=True)
+@click.option('-s', '--silent', is_flag=True, help="If listing a specific TPU by ID, and there is no such TPU, don't throw an error.")
+def list_tpus(zone, format, color, tpu, silent):
+  tpus = tpu
+  if len(tpus) <= 0:
+    print_tpus_status(zone=zone, format=format, color=color)
+  else:
+    if format == 'text':
+      print_tpu_status_headers()
+    for tpu in tpus:
+      tpu = tpudiepie.get_tpu(tpu, zone=zone, silent=silent)
+      if tpu is not None:
+        print_tpu_status(tpu, format=format, color=color)
 
 def complete_tpu_id(ctx, args, incomplete, zone=None):
   tpus = tpudiepie.get_tpus(zone=zone)

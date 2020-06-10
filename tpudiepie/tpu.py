@@ -135,7 +135,7 @@ def get_tpus(zone=None):
   else:
     return [tpu for tpu in tpus if '/{}/'.format(zone) in tpu['name']]
 
-def get_tpu(tpu, zone=None):
+def get_tpu(tpu, zone=None, silent=False):
   if isinstance(tpu, dict):
     tpu = parse_tpu_id(tpu)
   if isinstance(tpu, str) and re.match('^[0-9]+$', tpu):
@@ -149,6 +149,8 @@ def get_tpu(tpu, zone=None):
   if len(tpus) > 1:
     raise ValueError("Multiple TPUs matched {} {!r}. Try specifying --zone".format(which, tpu))
   if len(tpus) <= 0:
+    if silent:
+      return None
     raise ValueError("No TPUs matched {} {!r}".format(which, tpu))
   return tpus[0]
 
