@@ -70,22 +70,11 @@ def parse_tpu_network(tpu):
   net = tpu if isinstance(tpu, str) else tpu['network']
   return net.split('/')[-1]
 
+@ring.lru(expire=3600) # cache tpu zones for an hour
 def get_tpu_zones():
-  return [
-    #"asia-east1-a",
-    #"asia-east1-b",
-    "asia-east1-c",
-    "europe-west4-a",
-    #"europe-west4-b",
-    #"europe-west4-c",
-    "us-central1-a",
-    "us-central1-b",
-    "us-central1-c",
-    "us-central1-f",
-    #"us-east1-b",
-    #"us-east1-c",
-    #"us-east1-d",
-  ]
+  out = run("gcloud compute tpus locations list", format="json")
+  zones = json.loads(out)
+  return [zone['locationId'] for zone in zones]
 
 class nullcontext(contextlib.AbstractContextManager):
     """Context manager that does no additional processing.
