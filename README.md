@@ -1,7 +1,9 @@
 # tpudiepie
 
 `tpudiepie` (or `pu` for short) is a Python library and command-line
-program for managing TPUs.
+program for managing TPUs. For example, if you have a preemptible TPU
+named `foo`, then `pu babysit foo` will recreate it automatically
+whenever it preempts. See [examples](#examples).
 
 ## Contact
 
