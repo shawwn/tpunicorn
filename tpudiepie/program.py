@@ -57,19 +57,12 @@ def print_tpus_status(zone=None, format='text', color=True):
     for tpu in tpus:
       print_tpu_status(tpu, color=color)
 
-def watch_status():
+@cli.command()
+def top():
   while True:
     click.clear()
     print_tpus_status()
     time.sleep(5.0)
-
-@cli.command()
-def top():
-  watch_status()
-
-@cli.command()
-def tail():
-  watch_status()
 
 @cli.command("list")
 @click.option('--zone', type=click.Choice(tpudiepie.tpu.get_tpu_zones()))
@@ -78,6 +71,7 @@ def tail():
 @click.option('-t', '--tpu', type=click.STRING, help="List a specific TPU by id.", multiple=True)
 @click.option('-s', '--silent', is_flag=True, help="If listing a specific TPU by ID, and there is no such TPU, don't throw an error.")
 def list_tpus(zone, format, color, tpu, silent):
+  """List TPUs."""
   tpus = tpu
   if len(tpus) <= 0:
     print_tpus_status(zone=zone, format=format, color=color)
@@ -147,17 +141,16 @@ def do_step(label=None, command=None, dry_run=False, delay_after=1.0, args=(), k
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 @click.option('--zone', type=click.Choice(tpudiepie.tpu.get_tpu_zones()))
-@click.option('--version', type=click.STRING)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
-def delete(tpu, zone, version, yes, dry_run):
+def delete(tpu, zone, yes, dry_run):
   tpu = tpudiepie.get_tpu(tpu=tpu, zone=zone)
   click.echo('Current status of TPU:')
   print_tpu_status_headers()
   print_tpu_status(tpu)
   click.echo('')
   delete = tpudiepie.delete_tpu_command(tpu, zone=zone)
-  create = tpudiepie.create_tpu_command(tpu, zone=zone, version=version)
+  create = tpudiepie.create_tpu_command(tpu, zone=zone)
   def wait():
     wait_healthy(tpu, zone=zone)
   if not yes:
@@ -174,10 +167,14 @@ def delete(tpu, zone, version, yes, dry_run):
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 @click.option('--zone', type=click.Choice(tpudiepie.tpu.get_tpu_zones()))
-@click.option('--version', type=click.STRING)
+@click.option('--version', type=click.STRING, metavar="<TF_VERSION>",
+              help="By default, the TPU is reimaged with the same system software version."
+                   " (This is handy as a quick way to reboot a TPU, freeing up all memory.)"
+                   " You can set this to use a specific version, e.g. `nightly`.")
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
 def reimage(tpu, zone, version, yes, dry_run):
+  """Reimages the OS on a TPU."""
   tpu = tpudiepie.get_tpu(tpu=tpu, zone=zone)
   reimage = tpudiepie.reimage_tpu_command(tpu, version=version)
   def wait():
@@ -196,16 +193,21 @@ def reimage(tpu, zone, version, yes, dry_run):
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 @click.option('--zone', type=click.Choice(tpudiepie.tpu.get_tpu_zones()))
-@click.option('--version', type=click.STRING)
+@click.option('--version', type=click.STRING, metavar="<TF_VERSION>",
+              help="By default, the TPU is recreated with the same system software version."
+                   " You can set this to use a specific version, e.g. `nightly`.")
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
 @click.option('-p', '--preempted', is_flag=True,
               help="Only recreate TPU if it has preempted."
-                   """(Specifically, if the tpu's STATE is "PREEMPTED",proceed; otherwise do nothing.)""")
+                   """ (Specifically, if the tpu's STATE is "PREEMPTED",proceed; otherwise do nothing.)""")
 @click.option('-c', '--command', type=click.STRING, multiple=True,
               help="After the TPU is HEALTHY, run this command."
-              "(Useful for killing a training session after the TPU has been recreated.)")
+              " (Useful for killing a training session after the TPU has been recreated.)")
 def recreate(tpu, zone, version, yes, dry_run, preempted, command, **kws):
+  """
+  Recreates a TPU, optionally switching the system software to the specified TF_VERSION.
+  """
   tpu = tpudiepie.get_tpu(tpu=tpu, zone=zone)
   click.echo('Current status of TPU {} as of {}:'.format(tpudiepie.tpu.parse_tpu_id(tpu), tpudiepie.tpu.get_timestamp()))
   print_tpu_status_headers()
@@ -244,7 +246,7 @@ def recreate(tpu, zone, version, yes, dry_run, preempted, command, **kws):
               help='How often to check the TPU. (default: 30 seconds)')
 @click.option('-c', '--command', type=click.STRING, multiple=True,
               help="After the TPU has been recreated and is HEALTHY, run this command."
-                   "(Useful for killing a training session after the TPU has been recreated.)")
+                   " (Useful for killing a training session after the TPU has been recreated.)")
 @click.pass_context
 def babysit(ctx, tpu, zone, dry_run, interval, command):
   """Checks TPU every INTERVAL seconds. Recreates the TPU if (and only if) the tpu has preempted."""

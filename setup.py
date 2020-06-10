@@ -20,10 +20,12 @@ long_description = """
 To find out what's new in this version of tpudiepie, please see `the repo
 <https://github.com/shawwn/tpudiepie>`_.
 
-{}
-""".format(
-    open("README.rst").read()
-)
+Welcome to tpudiepie!
+=====================
+
+`tpudiepie` is a Python library and command-line program
+for managing TPUs.
+"""
 
 setuptools.setup(
     name=package_name,
