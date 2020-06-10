@@ -1,7 +1,33 @@
-# Welcome to tpudiepie!
+# tpudiepie
 
 `tpudiepie` (or `pu` for short) is a Python library and command-line
 program for managing TPUs.
+
+## Contact
+
+- Twitter: [@theshawwn](https://twitter.com/theshawwn)
+- HN: [sillysaurusx](https://news.ycombinator.com/item?id=23346972)
+- Discord: [ML Community](#Community)
+
+## Quickstart
+
+```
+# Install pu
+pip3 install -U --user tpudiepie
+
+# See your TPUs
+pu list
+
+# Recreate a TPU named foo
+pu recreate foo
+
+# Watch a TPU named foo. If it preempts, recreate it automatically
+pu babysit foo
+```
+
+Note that `pu` assumes you can successfully run
+`gcloud compute tpus list`. If so, then you're done! Otherwise,
+see the [Troubleshooting](#Troubleshooting) section.
 
 ## Examples
 
@@ -214,3 +240,128 @@ Options:
   --dry-run
   --help                          Show this message and exit.
 ```
+
+## Troubleshooting
+
+1. Ensure your project is set
+
+```
+gcloud config set project <your-project-id>
+```
+
+Note that the project ID isn't necessarily the same as the project
+name. You can get it via the GCE console:
+
+![image](https://user-images.githubusercontent.com/59632/84266707-c94b4580-aad9-11ea-8615-3a00926633c4.png)
+
+While you're there, go the [Cloud TPU](https://console.cloud.google.com/compute/tpus) page:
+
+![image](https://user-images.githubusercontent.com/59632/84266949-2d6e0980-aada-11ea-81e6-939391fac8b0.png)
+
+If it asks you to enable the Cloud TPU API, then do so. Afterwards you
+should see the GCE TPU dashboard:
+
+![image](https://user-images.githubusercontent.com/59632/84267077-5f7f6b80-aada-11ea-8590-a437f8dcc5e1.png)
+
+Create a TPU using "Create TPU node" to verify that your project has
+TPU quota in the desired region.
+
+2. Ensure your command-line tools are properly authenticated
+
+Use `gcloud auth list` to see your current account.
+
+If security isn't a concern, you can use `gcloud auth login` followed
+by `gcloud auth application-default login` to log in as your primary
+Google identity. Usually, this means that your terminal now has "root
+access" to all GCE resources.
+
+If you're on a server, you might want to use a service account
+instead.
+
+- create a [service
+  account](https://console.cloud.google.com/iam-admin/serviceaccounts),
+  granting it the "TPU Admin" role for TPU management, or "TPU Viewer"
+  role for read-only viewing. 
+
+- [create a keyfile](https://cloud.google.com/iam/docs/creating-managing-service-account-keys#iam-service-account-keys-create-gcloud)
+
+- Upload the keyfile to your server. (I use `wormhole send ~/keys.json`
+  for that. You can install it with `pip install magic-wormhole`.)
+
+- [activate your service account](https://cloud.google.com/sdk/gcloud/reference/auth/activate-service-account)
+
+For example, I created a `tpu-test` service account, then created a
+`~/tpu_key.json` keyfile:
+
+```
+$ gcloud iam service-accounts keys create ~/tpu_key.json --iam-account tpu-test@gpt-2-15b-poetry.iam.gserviceaccount.com
+created key [03db745322b4e7c4e9e2036386d1e908eb2e1a52] of type [json] as [/Users/bb/tpu_key.json] for [tpu-test@gpt-2-15b-poetry.iam.gserviceaccount.com]
+```
+
+Then I sent that `~/tpu_key.json` file my server, and activated the
+service account:
+
+```
+$ gcloud auth activate-service-account tpu-test@gpt-2-15b-poetry.iam.gserviceaccount.com --key-file ~/tpu_key.json
+Activated service account credentials for: [tpu-test@gpt-2-15b-poetry.iam.gserviceaccount.com]
+```
+
+
+I checked `gcloud auth list` to verify I'm now using that service
+account:
+```
+$ gcloud auth list
+                  Credentialed Accounts
+ACTIVE  ACCOUNT
+        shawnpresser@gmail.com
+*       tpu-test@gpt-2-15b-poetry.iam.gserviceaccount.com
+
+To set the active account, run:
+    $ gcloud config set account `ACCOUNT`
+
+```
+
+At that point, as long as you've run `gcloud config set project <your-project-id>`,
+then `gcloud compute tpus list --zone europe-west4-a` should be successful.
+
+(To avoid having to pass `--zone europe-west4-a` to all your gcloud
+commands, you can make it the default zone:
+
+```
+gcloud config set compute/zone europe-west4-a
+```
+
+As far as I know, it's completely safe to make a "TPU Viewer" service
+account world-readable. For example, if you want to let everyone view
+your TPUs [for some reason](https://www.tensorfork.com/tpus), you can
+simply stick the `~/tpu_key.json` file somewhere that anyone can
+download.
+
+(If this is mistaken, please [DM me on twitter](https://twitter.com/theshawwn).)
+
+## ML Community
+
+If you're an ML enthusiast, join our [TPU Podcast Discord Server](https://discordapp.com/invite/x52Xz3y).
+There are now ~400 members, with ~60 online at any given time:
+
+![image](https://user-images.githubusercontent.com/59632/84269906-bc7d2080-aade-11ea-8b4e-f78412855d43.png)
+
+There are a variety of interesting channels:
+
+- `#papers` for pointing out interesting research papers
+- `#research` for discussing ML research
+- `#show` and `#samples` for showing off your work
+- `#hardware` for hardware enthusiasts
+- `#ideas` for brainstorming
+- `#tensorflow` and `#pytorch`
+- `#cats`, `#doggos`, and of course `#memes`
+- A "bot zone" for interacting with our discord bots, such as using
+  `!waifu red_hair blue_eyes` to generate an anime character using
+  stylegan:
+![image](https://user-images.githubusercontent.com/59632/84270613-cfdcbb80-aadf-11ea-9762-83b0c84d4cc6.png)
+- Quite a few more.
+
+## Contact
+
+- Twitter: [@theshawwn](https://twitter.com/theshawwn)
+- HN: [sillysaurusx](https://news.ycombinator.com/item?id=23346972)
