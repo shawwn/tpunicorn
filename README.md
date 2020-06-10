@@ -231,7 +231,7 @@ pu list -t foo --format json
 # error. For each TPU, print a line of JSON. Then use `jq` to extract
 # some interesting subfields, and format the result using `column`.
 pu list -t foo -t bar -s --format json | \
-     jq ".name+\" \"+.state+\" \"+(.health//\"UNKNOWN\")" -c -r | column -t
+     jq '.name+" "+.state+" "+(.health//"UNKNOWN")' -c -r | column -t
 ```
 
 ## Commands
