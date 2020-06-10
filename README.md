@@ -13,7 +13,7 @@ program for managing TPUs.
 
 ```
 # Install pu
-pip3 install -U --user tpudiepie
+pip3 install -U tpudiepie
 
 # See your TPUs
 pu list
