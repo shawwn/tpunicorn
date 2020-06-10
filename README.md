@@ -7,7 +7,7 @@ program for managing TPUs.
 
 - Twitter: [@theshawwn](https://twitter.com/theshawwn)
 - HN: [sillysaurusx](https://news.ycombinator.com/item?id=23346972)
-- Discord: [ML Community](#Community)
+- Discord: [ML Community](#ml-community)
 
 ## Quickstart
 
@@ -27,7 +27,7 @@ pu babysit foo
 
 Note that `pu` assumes you can successfully run
 `gcloud compute tpus list`. If so, then you're done! Otherwise,
-see the [Troubleshooting](#Troubleshooting) section.
+see the [Troubleshooting](#troubleshooting) section.
 
 ## Examples
 
@@ -360,8 +360,3 @@ There are a variety of interesting channels:
   stylegan:
 ![image](https://user-images.githubusercontent.com/59632/84270613-cfdcbb80-aadf-11ea-9762-83b0c84d4cc6.png)
 - Quite a few more.
-
-## Contact
-
-- Twitter: [@theshawwn](https://twitter.com/theshawwn)
-- HN: [sillysaurusx](https://news.ycombinator.com/item?id=23346972)
