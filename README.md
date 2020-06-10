@@ -102,7 +102,7 @@ do
 done
 ```
 
-In a separate terminal, babysit a TPU:
+In a separate terminal, babysit a TPU named `my-tpu`:
 
 ```sh
 pu babysit my-tpu -c 'pkill -9 -f "My Training Session"'
