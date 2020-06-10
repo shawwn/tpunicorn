@@ -302,8 +302,8 @@ def format_args(tpu):
   r.update(format_widths())
   return r
 
-def get_default_format_spec():
-  return ' '.join([
+def get_default_format_specs(thin=False):
+  specs = [
     "{zone:{zone_w}}",
     "{index:<{index_w}}",
     "{type:{type_w}}",
@@ -316,11 +316,16 @@ def get_default_format_spec():
     "{master:{master_w}}",
     "{range:{range_w}}",
     "{preemptible!s:{preemptible_w}}",
-    ])
+  ]
+  if thin:
+    return ['{' + re.findall('{([^:]+)[:]', x)[0] + '}' for x in specs]
+  else:
+    return specs
+
+def get_default_format_spec(thin=False):
+  return ' '.join(get_default_format_specs(thin=thin))
 
 def format(tpu, spec=None, formatter=NamespaceFormatter):
-  if spec is None:
-    spec = get_default_format_spec()
   if tpu.get('kind', 'tpu') == 'tpu':
     args = format_args(tpu)
   else:
@@ -328,6 +333,8 @@ def format(tpu, spec=None, formatter=NamespaceFormatter):
     args.update(tpu)
     args.update(format_widths())
   fmt = formatter(args)
+  if spec is None:
+    spec = get_default_format_spec(thin=len(format_widths()) == 0)
   return fmt.format(spec)
 
 def create_tpu_command(tpu, zone=None, version=None, description=None, preemptible=None):
