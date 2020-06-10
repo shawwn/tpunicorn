@@ -133,21 +133,32 @@ Lastly, consider running your actual training script like so:
 ```
 while true
 do
-  timeout --signal=SIGKILL 5h <your training command>
+  timeout --signal=SIGKILL 11h <your training command>
   echo restarting
   sleep 30
 done
 ```
 
-This will force-kill your training command after a maximum of
-5 hours of training. Meaning, if your training session freezes
-for some reason (e.g. the TPU gets into a bad state, which is
-surprisingly common) then you'll lose no more than a few hours
-of training time.
+This will force-kill your training command after a maximum of 11 hours
+of training (rather than waiting the theoretical maximum of 24 hours
+before your TPU preempts). This way, if your training session freezes
+for some reason (e.g. the TPUEstimator API stops making progress) then
+you'll lose no more than a few hours of training time.
 
-Without this, we kept running into situations like "wake up the
-next day and discover that the training session had been frozen
-for the last 12 hours, requiring a manual TPU restart."
+Without this, we kept running into situations like "wake up the next
+day and discover that the training session has been frozen for the
+last 12 hours." We're still not entirely sure why. Suffice to say,
+if your training session takes an hour to get into a stable state,
+you'll lose only ~2 hours in the usual case (no freezes; everything
+normal) and gain several hours in the worst case (the training loop
+froze and no one noticed).
+
+You might feel tempted to put a `pu recreate $TPU_NAME -y` command
+inside that while loop. After all, if your training session
+terminates, shouldn't it recreate the TPU? Perhaps; feel free to try
+it out and see if you like it. In our experience, we've found it's
+more effective to [manage our TPUs separately](tensorfork.com/tpus)
+rather than try to solve both concerns in the same script.
 
 ### Listing TPUs
 
