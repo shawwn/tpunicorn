@@ -13,9 +13,16 @@ program for managing TPUs.
 
 ```
 # Install pu
-pip3 install -U tpudiepie
+sudo pip3 install -U tpudiepie
+```
 
-# See your TPUs
+(Use `sudo pip3` at your own risk. It's potentially easier, since
+`pu` is guaranteed to end up on your PATH regardless of your
+platform, but see [installation caveats](#installation-caveats)
+for a discussion of the tradeoffs.)
+
+```
+# View your TPUs
 pu list
 
 # Recreate a TPU named foo
@@ -25,9 +32,48 @@ pu recreate foo
 pu babysit foo
 ```
 
-Note that `pu` assumes you can successfully run
+Skip ahead to [examples](#examples) to see what else `pu` can do.
+
+### Installation Caveats
+
+- `pu` assumes you can successfully run
 `gcloud compute tpus list`. If so, then you're done! Otherwise,
 see the [Troubleshooting](#troubleshooting) section.
+
+- Rather than `sudo pip3 install -U tpudiepie`, you can install
+via a more "recommended" approach. (For example, the magic wormhole
+project lists some
+[reasons](https://magic-wormhole.readthedocs.io/en/latest/welcome.html#install-from-source)
+you might want to avoid `sudo pip3`.)
+
+Option 1: a local install
+```
+pip3 install --user -U tpudiepie
+# add python's user directory to your PATH
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+# restart your shell
+exec -l $SHELL
+# does pu work?
+pu list
+```
+
+Option 2: a virtualenv
+```
+virtualenv venv
+source venv/bin/activate
+pip3 install tpudiepie
+pu list
+```
+
+Unfortunately, you may experience a serious slowdown when using venv.
+`pu` is implemented by shelling out to `gcloud compute tpus ...`, and
+`gcloud` seems to be very unhappy when it's run inside of a
+virtualenv. `gcloud compute tpus list` takes ~8 seconds for me, which
+is a noticeable delay, and makes `pu list` quite uncomfortable to use.
+I've attempted to debug this, but as far as I can tell, the slowdown
+is somewhere deep inside of gcloud internals related to reconfiguring
+paths. I assume it's detecting the venv and doing some sort of
+reconfiguration to account for it.
 
 ## Examples
 
