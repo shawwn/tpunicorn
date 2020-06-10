@@ -269,7 +269,7 @@ Usage: tpudiepie recreate [OPTIONS] TPU
 Options:
   --zone [asia-east1-c|europe-west4-a|us-central1-a|us-central1-b|us-central1-c|us-central1-f]
   --version <TF_VERSION>          By default, the TPU is recreated with the
-                                  same system software version.You can set
+                                  same system software version. You can set
                                   this to use a specific version, e.g.
                                   `nightly`.
 
@@ -317,7 +317,7 @@ Options:
   --version <TF_VERSION>          By default, the TPU is reimaged with the
                                   same system software version. (This is handy
                                   as a quick way to reboot a TPU, freeing up
-                                  all memory.)You can set this to use a
+                                  all memory.) You can set this to use a
                                   specific version, e.g. `nightly`.
 
   -y, --yes
@@ -382,7 +382,7 @@ $ gcloud iam service-accounts keys create ~/tpu_key.json --iam-account tpu-test@
 created key [03db745322b4e7c4e9e2036386d1e908eb2e1a52] of type [json] as [/Users/bb/tpu_key.json] for [tpu-test@gpt-2-15b-poetry.iam.gserviceaccount.com]
 ```
 
-Then I sent that `~/tpu_key.json` file my server, and activated the
+Then I sent that `~/tpu_key.json` file to my server, and activated the
 service account:
 
 ```
