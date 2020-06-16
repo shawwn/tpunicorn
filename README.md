@@ -12,6 +12,7 @@ See [examples](#examples).
 - Twitter: [@theshawwn](https://twitter.com/theshawwn)
 - HN: [sillysaurusx](https://news.ycombinator.com/item?id=23346972)
 - Discord: [ML Community](#ml-community)
+- Patreon: [thank you!](https://www.shawwn.com/thanks)
 
 ## Quickstart
 
@@ -444,3 +445,7 @@ There are a variety of interesting channels:
   stylegan:
 ![image](https://user-images.githubusercontent.com/59632/84270613-cfdcbb80-aadf-11ea-9762-83b0c84d4cc6.png)
 - Quite a few more.
+
+## Support
+
+*If you found this library heplful, consider [joining my patreon](https://www.shawwn.com/thanks).*
