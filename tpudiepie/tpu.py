@@ -76,7 +76,25 @@ def get_tpu_zones():
   zones = json.loads(out)
   return [zone['locationId'] for zone in zones]
 
-class nullcontext(contextlib.AbstractContextManager):
+
+# Python 3.5 backport. Is there a more elegant way to get a nullcontext?
+import abc
+
+
+class AbstractContextManager(abc.ABC):
+  """An abstract base class for context managers."""
+
+  def __enter__(self):
+    """Return `self` upon entering the runtime context."""
+    return self
+
+  @abc.abstractmethod
+  def __exit__(self, exc_type, exc_value, traceback):
+    """Raise any exception triggered within the runtime context."""
+    return None
+
+
+class nullcontext(AbstractContextManager):
     """Context manager that does no additional processing.
     Used as a stand-in for a normal context manager, when a particular
     block of code is only sometimes used with a normal context manager:
@@ -93,6 +111,7 @@ class nullcontext(contextlib.AbstractContextManager):
 
     def __exit__(self, *excinfo):
         pass
+
 
 def click_context():
   try:
