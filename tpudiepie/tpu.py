@@ -3,12 +3,9 @@ from subprocess import check_output
 import json
 import re
 import ring
-import sys
 import os
 import logging
 import threading
-import contextlib
-from pprint import pprint as pp
 
 logger = logging.getLogger('tpudiepie')
 
@@ -43,6 +40,8 @@ def system(cmd, *args, **kws):
 def run(cmd, *args, **kws):
   command = build_commandline(cmd, *args, **kws)
   out = check_output(ero(command), shell=True)
+  if isinstance(out, bytes):
+    out = out.decode('utf8')
   return out
 
 def parse_tpu_project(tpu):
