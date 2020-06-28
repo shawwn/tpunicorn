@@ -448,4 +448,4 @@ There are a variety of interesting channels:
 
 ## Support
 
-*If you found this library heplful, consider [joining my patreon](https://www.shawwn.com/thanks).*
+*If you found this library helpful, consider [joining my patreon](https://www.shawwn.com/thanks).*
