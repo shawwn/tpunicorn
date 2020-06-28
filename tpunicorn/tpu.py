@@ -7,6 +7,13 @@ import os
 import logging
 import threading
 
+# https://github.com/googleapis/google-auth-library-python/issues/271#issuecomment-400186626
+import warnings
+warnings.filterwarnings("ignore", "Your application has authenticated using end user credentials")
+
+import googleapiclient.discovery
+api = googleapiclient.discovery.build('tpu', 'v1')
+
 logger = logging.getLogger('tpunicorn')
 
 # create console handler and set level to debug
@@ -69,101 +76,72 @@ def parse_tpu_network(tpu):
   net = tpu if isinstance(tpu, str) else tpu['network']
   return net.split('/')[-1]
 
+
+import google.auth
+
+def _determine_default_project(project=None):
+    """Determine default project ID explicitly or implicitly as fall-back.
+
+    See :func:`google.auth.default` for details on how the default project
+    is determined.
+
+    :type project: str
+    :param project: Optional. The project name to use as default.
+
+    :rtype: str or ``NoneType``
+    :returns: Default project if it can be determined.
+    """
+    if project is None:
+        _, project = google.auth.default()
+    return project
+
+
+
+@ring.lru(expire=3600) # cache default project for an hour
+def get_default_project(project=None):
+  return _determine_default_project(project=project)
+
 @ring.lru(expire=3600) # cache tpu zones for an hour
-def get_tpu_zones():
-  out = run("gcloud compute tpus locations list", format="json")
-  zones = json.loads(out)
+def get_tpu_zones(project=None):
+  zones = api.projects().locations().list(name='projects/'+get_default_project(project=project)).execute().get('locations', [])
   return [zone['locationId'] for zone in zones]
 
-
-# Python 3.5 backport. Is there a more elegant way to get a nullcontext?
-import abc
-
-
-class AbstractContextManager(abc.ABC):
-  """An abstract base class for context managers."""
-
-  def __enter__(self):
-    """Return `self` upon entering the runtime context."""
-    return self
-
-  @abc.abstractmethod
-  def __exit__(self, exc_type, exc_value, traceback):
-    """Raise any exception triggered within the runtime context."""
-    return None
-
-
-class nullcontext(AbstractContextManager):
-    """Context manager that does no additional processing.
-    Used as a stand-in for a normal context manager, when a particular
-    block of code is only sometimes used with a normal context manager:
-    cm = optional_cm if condition else nullcontext()
-    with cm:
-        # Perform operation, using optional_cm if condition is True
-    """
-
-    def __init__(self, enter_result=None):
-        self.enter_result = enter_result
-
-    def __enter__(self):
-        return self.enter_result
-
-    def __exit__(self, *excinfo):
-        pass
-
-
-def click_context():
-  try:
-    import click
-    ctx = click.get_current_context(silent=True)
-  except:
-    ctx = None
-  if ctx is None:
-    ctx = nullcontext()
-  return ctx
-
 @ring.lru(expire=15) # cache tpu info for 15 seconds
-def fetch_tpus(zone=None):
+def fetch_tpus(zone=None, project=None):
   if zone is None:
-    zones = get_tpu_zones()
+    zones = get_tpu_zones(project=project)
   if isinstance(zone, str):
     zones = zone.split(',')
   tpus = []
-  ctx = click_context()
-  def fetch(zone):
-    with ctx:
-      more = list_tpus(zone)
-      tpus.extend(more)
-  threads = [threading.Thread(target=fetch, args=(zone,), daemon=True) for zone in zones]
-  for thread in threads:
-    thread.start()
-  for thread in threads:
-    thread.join()
+  for zone in zones:
+    results = list_tpus(zone)
+    tpus.extend(results)
   return tpus
 
-def list_tpus(zone):
-  out = run("gcloud compute tpus list", format="json", zone=zone)
-  tpus = json.loads(out)
+def list_tpus(zone, project=None):
+  if '/' not in zone:
+    zone = 'projects/' + get_default_project(project=project) + '/locations/' + zone
+  tpus = api.projects().locations().nodes().list(parent=zone).execute().get('nodes', [])
   return list(sorted(tpus, key=parse_tpu_index))
 
-def get_tpus(zone=None):
-  tpus = fetch_tpus(zone=zone)
+def get_tpus(zone=None, project=None):
+  tpus = fetch_tpus(zone=zone, project=project)
   if zone is None:
     return tpus
   else:
     return [tpu for tpu in tpus if '/{}/'.format(zone) in tpu['name']]
 
-def get_tpu(tpu, zone=None, silent=False):
+def get_tpu(tpu, zone=None, project=None, silent=False):
   if isinstance(tpu, dict):
     tpu = parse_tpu_id(tpu)
   if isinstance(tpu, str) and re.match('^[0-9]+$', tpu):
     tpu = int(tpu)
   if isinstance(tpu, int):
     which = 'index'
-    tpus = [x for x in get_tpus(zone=zone) if parse_tpu_index(x) == tpu]
+    tpus = [x for x in get_tpus(zone=zone, project=project) if parse_tpu_index(x) == tpu]
   else:
     which = 'id'
-    tpus = [x for x in get_tpus(zone=zone) if parse_tpu_id(x) == tpu]
+    tpus = [x for x in get_tpus(zone=zone, project=project) if parse_tpu_id(x) == tpu]
   if len(tpus) > 1:
     raise ValueError("Multiple TPUs matched {} {!r}. Try specifying --zone".format(which, tpu))
   if len(tpus) <= 0:
@@ -377,9 +355,11 @@ def format(tpu, spec=None, formatter=NamespaceFormatter):
     spec = get_default_format_spec(thin=len(format_widths()) == 0)
   return fmt.format(spec)
 
-def create_tpu_command(tpu, zone=None, version=None, description=None, preemptible=None):
+def create_tpu_command(tpu, zone=None, project=None, version=None, description=None, preemptible=None):
   if zone is None:
     zone = parse_tpu_zone(tpu)
+  if project is None:
+    project = parse_tpu_project(tpu)
   if version is None:
     version = parse_tpu_version(tpu)
   if description is None:
@@ -389,6 +369,7 @@ def create_tpu_command(tpu, zone=None, version=None, description=None, preemptib
   return build_commandline("gcloud compute tpus create",
                            parse_tpu_id(tpu),
                            zone=zone,
+                           project=project,
                            network=parse_tpu_network(tpu),
                            range=parse_tpu_range(tpu),
                            version=version,
@@ -397,21 +378,29 @@ def create_tpu_command(tpu, zone=None, version=None, description=None, preemptib
                            description=description,
                            )
 
-def delete_tpu_command(tpu, zone=None):
+def delete_tpu_command(tpu, zone=None, project=None):
   if zone is None:
     zone = parse_tpu_zone(tpu)
+  if project is None:
+    project = parse_tpu_project(tpu)
   return build_commandline("gcloud compute tpus delete",
                            parse_tpu_id(tpu),
                            zone=zone,
+                           project=project,
                            quiet=True,
                            )
 
-def reimage_tpu_command(tpu, version=None):
+def reimage_tpu_command(tpu, zone=None, project=None, version=None):
+  if zone is None:
+    zone = parse_tpu_zone(tpu)
+  if project is None:
+    project = parse_tpu_project(tpu)
   if version is None:
     version = parse_tpu_version(tpu)
   return build_commandline("gcloud compute tpus reimage",
                            parse_tpu_id(tpu),
-                           zone=parse_tpu_zone(tpu),
+                           zone=zone,
+                           project=project,
                            version=version,
                            quiet=True,
                            )

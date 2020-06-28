@@ -47,8 +47,8 @@ def print_tpu_status(tpu, format='text', color=True):
     else:
       click.secho(message, fg='yellow')
 
-def print_tpus_status(zone=None, format='text', color=True):
-  tpus = tpunicorn.get_tpus(zone=zone)
+def print_tpus_status(zone=None, project=None, format='text', color=True):
+  tpus = tpunicorn.get_tpus(zone=zone, project=project)
   if format == 'json':
     click.echo(json.dumps(tpus))
   else:
@@ -66,42 +66,44 @@ def top():
 
 @cli.command("list")
 @click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('--project', type=click.STRING, default=None)
 @click.option('--format', type=click.Choice(['text', 'json']), default='text')
 @click.option('-c/-nc', '--color/--no-color', default=True)
 @click.option('-t', '--tpu', type=click.STRING, help="List a specific TPU by id.", multiple=True)
 @click.option('-s', '--silent', is_flag=True, help="If listing a specific TPU by ID, and there is no such TPU, don't throw an error.")
-def list_tpus(zone, format, color, tpu, silent):
+def list_tpus(zone, project, format, color, tpu, silent):
   """List TPUs."""
   tpus = tpu
   if len(tpus) <= 0:
-    print_tpus_status(zone=zone, format=format, color=color)
+    print_tpus_status(zone=zone, project=project, format=format, color=color)
   else:
     if format == 'text':
       print_tpu_status_headers()
     for tpu in tpus:
-      tpu = tpunicorn.get_tpu(tpu, zone=zone, silent=silent)
+      tpu = tpunicorn.get_tpu(tpu, zone=zone, project=project, silent=silent)
       if tpu is not None:
         print_tpu_status(tpu, format=format, color=color)
 
-def complete_tpu_id(ctx, args, incomplete, zone=None):
-  tpus = tpunicorn.get_tpus(zone=zone)
+def complete_tpu_id(ctx, args, incomplete, zone=None, project=None):
+  tpus = tpunicorn.get_tpus(zone=zone, project=project)
   return [tpunicorn.tpu.parse_tpu_id(tpu) for tpu in tpus]
 
 # @cli.command()
 # @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 # @click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
-# def create(tpu, zone):
-#   tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone)
+# @click.option('--project', type=click.STRING, default=None)
+# def create(tpu, zone, project):
+#   tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone, project=project)
 #   create = tpunicorn.create_tpu_command(tpu)
 #   click.echo(create)
 
-def is_preempted(tpu, zone=None):
-  tpu = tpunicorn.get_tpu(tpu, zone=zone)
+def is_preempted(tpu, zone=None, project=None):
+  tpu = tpunicorn.get_tpu(tpu, zone=zone, project=project)
   status = tpunicorn.format(tpu, '{status}')
   return status == 'PREEMPTED'
 
-def check_healthy(tpu, zone=None, color=True, noisy=True):
-  tpu = tpunicorn.get_tpu(tpu, zone=zone)
+def check_healthy(tpu, zone=None, project=None, color=True, noisy=True):
+  tpu = tpunicorn.get_tpu(tpu, zone=zone, project=project)
   if noisy:
     print_tpu_status(tpu, color=color)
   status = tpunicorn.format(tpu, '{status}')
@@ -110,9 +112,10 @@ def check_healthy(tpu, zone=None, color=True, noisy=True):
     return True
   return False
 
-def wait_healthy(tpu, zone=None, color=True):
+def wait_healthy(tpu, zone=None, project=None, color=True):
+  print_tpu_status_headers()
   while True:
-    if check_healthy(tpu, color=color):
+    if check_healthy(tpu, zone=zone, project=project, color=color):
       return
     click.echo('TPU {} not yet healthy; waiting 30 seconds...'.format(tpunicorn.tpu.parse_tpu_id(tpu)))
     time.sleep(30.0)
@@ -141,18 +144,17 @@ def do_step(label=None, command=None, dry_run=False, delay_after=1.0, args=(), k
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 @click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
-def delete(tpu, zone, yes, dry_run):
-  tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone)
+def delete(tpu, zone, project, yes, dry_run):
+  tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone, project=project)
   click.echo('Current status of TPU:')
   print_tpu_status_headers()
   print_tpu_status(tpu)
   click.echo('')
-  delete = tpunicorn.delete_tpu_command(tpu, zone=zone)
-  create = tpunicorn.create_tpu_command(tpu, zone=zone)
-  def wait():
-    wait_healthy(tpu, zone=zone)
+  delete = tpunicorn.delete_tpu_command(tpu, zone=zone, project=project)
+  create = tpunicorn.create_tpu_command(tpu, zone=zone, project=project)
   if not yes:
     print_step('Step 1: delete TPU.', delete)
     if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
@@ -167,18 +169,19 @@ def delete(tpu, zone, yes, dry_run):
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 @click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('--project', type=click.STRING, default=None)
 @click.option('--version', type=click.STRING, metavar="<TF_VERSION>",
               help="By default, the TPU is reimaged with the same system software version."
                    " (This is handy as a quick way to reboot a TPU, freeing up all memory.)"
                    " You can set this to use a specific version, e.g. `nightly`.")
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
-def reimage(tpu, zone, version, yes, dry_run):
+def reimage(tpu, zone, project, version, yes, dry_run):
   """Reimages the OS on a TPU."""
-  tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone)
-  reimage = tpunicorn.reimage_tpu_command(tpu, version=version)
+  tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone, project=project)
+  reimage = tpunicorn.reimage_tpu_command(tpu, zone=zone, project=project, version=version)
   def wait():
-    wait_healthy(tpu, zone=zone)
+    wait_healthy(tpu, zone=zone, project=project)
   if not yes:
     print_step('Step 1: reimage TPU.', reimage)
     print_step('Step 2: wait until TPU is HEALTHY.', wait)
@@ -193,6 +196,7 @@ def reimage(tpu, zone, version, yes, dry_run):
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 @click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('--project', type=click.STRING, default=None)
 @click.option('--version', type=click.STRING, metavar="<TF_VERSION>",
               help="By default, the TPU is recreated with the same system software version."
                    " You can set this to use a specific version, e.g. `nightly`.")
@@ -204,21 +208,21 @@ def reimage(tpu, zone, version, yes, dry_run):
 @click.option('-c', '--command', type=click.STRING, multiple=True,
               help="After the TPU is HEALTHY, run this command."
               " (Useful for killing a training session after the TPU has been recreated.)")
-def recreate(tpu, zone, version, yes, dry_run, preempted, command, **kws):
+def recreate(tpu, zone, project, version, yes, dry_run, preempted, command, **kws):
   """
   Recreates a TPU, optionally switching the system software to the specified TF_VERSION.
   """
-  tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone)
+  tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone, project=project)
   click.echo('Current status of TPU {} as of {}:'.format(tpunicorn.tpu.parse_tpu_id(tpu), tpunicorn.tpu.get_timestamp()))
   print_tpu_status_headers()
   print_tpu_status(tpu)
-  if preempted and not is_preempted(tpu, zone=zone):
+  if preempted and not is_preempted(tpu, zone=zone, project=project):
     return
   click.echo('')
-  delete = tpunicorn.delete_tpu_command(tpu, zone=zone)
-  create = tpunicorn.create_tpu_command(tpu, zone=zone, version=version)
+  delete = tpunicorn.delete_tpu_command(tpu, zone=zone, project=project)
+  create = tpunicorn.create_tpu_command(tpu, zone=zone, project=project, version=version)
   def wait():
-    wait_healthy(tpu, zone=zone)
+    wait_healthy(tpu, zone=zone, project=project)
   if not yes:
     print_step('Step 1: delete TPU.', delete)
     print_step('Step 2: create TPU.', create)
@@ -241,6 +245,7 @@ def recreate(tpu, zone, version, yes, dry_run, preempted, command, **kws):
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 @click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('--project', type=click.STRING, default=None)
 @click.option('--dry-run', is_flag=True)
 @click.option('-i', '--interval', type=click.INT, default=30, metavar='<seconds>',
               help='How often to check the TPU. (default: 30 seconds)')
@@ -248,7 +253,7 @@ def recreate(tpu, zone, version, yes, dry_run, preempted, command, **kws):
               help="After the TPU has been recreated and is HEALTHY, run this command."
                    " (Useful for killing a training session after the TPU has been recreated.)")
 @click.pass_context
-def babysit(ctx, tpu, zone, dry_run, interval, command):
+def babysit(ctx, tpu, zone, project, dry_run, interval, command):
   """Checks TPU every INTERVAL seconds. Recreates the TPU if (and only if) the tpu has preempted."""
   # cmd = cli.get_command(ctx, 'babysit')
   # ctx = click.Context(cmd, parent=ctx, ignore_unknown_options=True)

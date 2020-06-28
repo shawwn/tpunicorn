@@ -41,6 +41,8 @@ setuptools.setup(
         'six>=1.11.0',
         'ring>=0.7.3',
         'moment>=0.0.10',
+        'google-auth>=0.11.0',
+        'google-api-python-client>=1.7.11',
     ],
     packages=packages,
     entry_points={
