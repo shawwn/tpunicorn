@@ -3,7 +3,7 @@
 import setuptools
 import os
 
-package_name = "tpudiepie"
+package_name = "tpunicorn"
 packages = setuptools.find_packages(
     include=[package_name, "{}.*".format(package_name)]
 )
@@ -17,13 +17,13 @@ binary_names = _locals["binary_names"]
 
 # Frankenstein long_description: changelog note + README
 long_description = """
-To find out what's new in this version of tpudiepie, please see `the repo
-<https://github.com/shawwn/tpudiepie>`_.
+To find out what's new in this version of tpunicorn, please see `the repo
+<https://github.com/shawwn/tpunicorn>`_.
 
-Welcome to tpudiepie!
+Welcome to tpunicorn!
 =====================
 
-`tpudiepie` is a Python library and command-line program
+`tpunicorn` is a Python library and command-line program
 for managing TPUs.
 """
 
@@ -35,7 +35,7 @@ setuptools.setup(
     long_description=long_description,
     author="Shawn Presser",
     author_email="shawnpresser@gmail.com",
-    url="https://github.com/shawwn/tpudiepie",
+    url="https://github.com/shawwn/tpunicorn",
     install_requires=[
         'Click>=7.1.2',
         'six>=1.11.0',

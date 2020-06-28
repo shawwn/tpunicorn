@@ -1,5 +1,5 @@
 ===============================================================================
-tpudiepie -- a TPU command-line interface.
+tpunicorn -- a TPU command-line interface.
 
 Copyright (C) 2020 Shawn Presser. All rights reserved.
 
@@ -24,7 +24,7 @@ THE SOFTWARE.
 [ MIT license: http://www.opensource.org/licenses/mit-license.php ]
 
 ===============================================================================
-[ tpudiepie includes code from Invoke 1.4.1, which has this license statement: ]
+[ tpunicorn includes code from Invoke 1.4.1, which has this license statement: ]
 
 Copyright (c) 2020 Jeff Forcier.
 All rights reserved.

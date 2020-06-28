@@ -1,6 +1,6 @@
-# tpudiepie
+# tpunicorn
 
-`tpudiepie` (or `pu` for short) is a Python library and command-line
+`tpunicorn` (or `pu` for short) is a Python library and command-line
 program for managing TPUs. For example, if you have a preemptible TPU
 named `foo`, then `pu babysit foo` will recreate it automatically
 whenever it preempts.
@@ -18,7 +18,7 @@ See [examples](#examples).
 
 ```
 # Install pu
-sudo pip3 install -U tpudiepie
+sudo pip3 install -U tpunicorn
 ```
 
 (Use `sudo pip3` at your own risk. It's potentially easier, since
@@ -45,7 +45,7 @@ Skip ahead to [examples](#examples) to see what else `pu` can do.
 `gcloud compute tpus list`. If so, then you're done! Otherwise,
 see the [Troubleshooting](#troubleshooting) section.
 
-- Rather than `sudo pip3 install -U tpudiepie`, you can install
+- Rather than `sudo pip3 install -U tpunicorn`, you can install
 via a more "recommended" approach. (For example, the magic wormhole
 project lists some
 [reasons](https://magic-wormhole.readthedocs.io/en/latest/welcome.html#install-from-source)
@@ -53,7 +53,7 @@ you might want to avoid `sudo pip3`.)
 
 Option 1: a local install
 ```
-pip3 install --user -U tpudiepie
+pip3 install --user -U tpunicorn
 # add python's user directory to your PATH
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 # restart your shell
@@ -66,7 +66,7 @@ Option 2: a virtualenv
 ```
 virtualenv venv
 source venv/bin/activate
-pip3 install tpudiepie
+pip3 install tpunicorn
 pu list
 ```
 
@@ -240,7 +240,7 @@ pu list -t foo -t bar -s --format json | \
 ### `pu babysit`
 
 ```
-Usage: tpudiepie babysit [OPTIONS] TPU
+Usage: tpunicorn babysit [OPTIONS] TPU
 
   Checks TPU every INTERVAL seconds. Recreates the TPU if (and only if) the
   tpu has preempted.
@@ -262,7 +262,7 @@ Options:
 ### `pu recreate`
 
 ```
-Usage: tpudiepie recreate [OPTIONS] TPU
+Usage: tpunicorn recreate [OPTIONS] TPU
 
   Recreates a TPU, optionally switching the system software to the specified
   TF_VERSION.
@@ -291,7 +291,7 @@ Options:
 ### `pu list`
 
 ```
-Usage: tpudiepie list [OPTIONS]
+Usage: tpunicorn list [OPTIONS]
 
   List TPUs.
 
@@ -309,7 +309,7 @@ Options:
 ### `pu reimage`
 
 ```
-Usage: tpudiepie reimage [OPTIONS] TPU
+Usage: tpunicorn reimage [OPTIONS] TPU
 
   Reimages the OS on a TPU.
 

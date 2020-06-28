@@ -7,7 +7,7 @@ import os
 import logging
 import threading
 
-logger = logging.getLogger('tpudiepie')
+logger = logging.getLogger('tpunicorn')
 
 # create console handler and set level to debug
 ch = logging.StreamHandler()
