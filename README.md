@@ -208,7 +208,7 @@ You might feel tempted to put a `pu recreate $TPU_NAME -y` command
 inside that while loop. After all, if your training session
 terminates, shouldn't it recreate the TPU? Perhaps; feel free to try
 it out and see if you like it. In our experience, we've found it's
-more effective to [manage our TPUs separately](tensorfork.com/tpus)
+more effective to [manage our TPUs separately](https://www.tensorfork.com/tpus)
 rather than try to solve both concerns in the same script.
 
 ### Listing TPUs
