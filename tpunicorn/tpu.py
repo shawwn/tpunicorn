@@ -350,7 +350,7 @@ def format(tpu, spec=None, formatter=NamespaceFormatter):
     args = {}
     args.update(tpu)
     args.update(format_widths())
-  args = {k: v or '' for k, v in args.items()}
+  args = {k: v if v is not None else '' for k, v in args.items()}
   fmt = formatter(args)
   if spec is None:
     spec = get_default_format_spec(thin=len(format_widths()) == 0)
