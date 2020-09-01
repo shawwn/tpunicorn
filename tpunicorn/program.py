@@ -245,7 +245,7 @@ def recreate(tpu, zone, project, version, yes, dry_run, preempted, command, retr
       break
     n = random.uniform(1, retry_randomness)
     click.echo('TPU {} failed to create; trying again in {} minutes...'.format(tpunicorn.tpu.parse_tpu_id(tpu),
-                                                                               (retry_after * n)//60), err=True)
+                                                                               int((retry_after * n)//60)), err=True)
     time.sleep(retry_after * n)
   do_step('Step 3: wait for TPU to become HEALTHY...', wait, dry_run=dry_run)
   if len(command) > 0:
