@@ -4,6 +4,7 @@ import json
 import sys
 import os
 import time
+import random
 from pprint import pprint as pp
 
 import logging as pylogging
@@ -130,6 +131,7 @@ def print_step(label=None, command=None, args=(), kwargs={}):
 
 def do_step(label=None, command=None, dry_run=False, delay_after=1.0, args=(), kwargs={}):
   print_step(label=label, command=command, args=args, kwargs=kwargs)
+  result = 0
   if command is not None:
     if dry_run:
       click.echo('Dry run; command skipped.')
@@ -138,8 +140,9 @@ def do_step(label=None, command=None, dry_run=False, delay_after=1.0, args=(), k
       if callable(command):
         command(*args, **kwargs)
       else:
-        os.system(command)
+        result = os.system(command)
       time.sleep(delay_after)
+  return result
 
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
@@ -208,7 +211,10 @@ def reimage(tpu, zone, project, version, yes, dry_run):
 @click.option('-c', '--command', type=click.STRING, multiple=True,
               help="After the TPU is HEALTHY, run this command."
               " (Useful for killing a training session after the TPU has been recreated.)")
-def recreate(tpu, zone, project, version, yes, dry_run, preempted, command, **kws):
+@click.option('--retry', type=int, help="if the TPU creation fails (due to capacity errors or otherwise), "
+                                        "retry the creation command after this many seconds")
+@click.option('--retry-randomness', type=float,  help="multiply retry time by a float between 1 and retry_randomness")
+def recreate(tpu, zone, project, version, yes, dry_run, preempted, command, retry=None, retry_randomness=1.0, **kws):
   """
   Recreates a TPU, optionally switching the system software to the specified TF_VERSION.
   """
@@ -233,7 +239,14 @@ def recreate(tpu, zone, project, version, yes, dry_run, preempted, command, **kw
     if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
       return
   do_step('Step 1: delete TPU...', delete, dry_run=dry_run)
-  do_step('Step 2: create TPU...', create, dry_run=dry_run)
+  while do_step('Step 2: create TPU...', create, dry_run=dry_run) != 0:
+    if retry is None:
+      click.echo('TPU {} failed to create (is the region out of capacity?)'.format(tpunicorn.tpu.parse_tpu_id(tpu)), err=True)
+      break
+    n = random.uniform(1, retry_randomness)
+    click.echo('TPU {} failed to create; trying again in {} minutes...'.format(tpunicorn.tpu.parse_tpu_id(tpu),
+                                                                               int((retry * n)//60)), err=True)
+    time.sleep(retry * n)
   do_step('Step 3: wait for TPU to become HEALTHY...', wait, dry_run=dry_run)
   if len(command) > 0:
     for i, cmd in enumerate(command):
