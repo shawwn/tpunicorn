@@ -211,9 +211,9 @@ def reimage(tpu, zone, project, version, yes, dry_run):
 @click.option('-c', '--command', type=click.STRING, multiple=True,
               help="After the TPU is HEALTHY, run this command."
               " (Useful for killing a training session after the TPU has been recreated.)")
-@click.option('--retry_after', type=int, help="if the TPU creation fails (due to capacity errors or otherwise), "
-                                              "retry the creation command after retry_after secs")
-@click.option('--retry_randomness', type=int,  help="multiply retry_after param by a number between 1 and retry_randomness")
+@click.option('--retry', type=int, help="if the TPU creation fails (due to capacity errors or otherwise), "
+                                        "retry the creation command after retry_after secs")
+@click.option('--retry-randomness', type=float,  help="multiply retry_after param by a number between 1 and retry_randomness")
 def recreate(tpu, zone, project, version, yes, dry_run, preempted, command, retry_after=None, retry_randomness=1, **kws):
   """
   Recreates a TPU, optionally switching the system software to the specified TF_VERSION.
