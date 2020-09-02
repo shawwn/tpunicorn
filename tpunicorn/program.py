@@ -212,9 +212,9 @@ def reimage(tpu, zone, project, version, yes, dry_run):
               help="After the TPU is HEALTHY, run this command."
               " (Useful for killing a training session after the TPU has been recreated.)")
 @click.option('--retry', type=int, help="if the TPU creation fails (due to capacity errors or otherwise), "
-                                        "retry the creation command after retry_after secs")
-@click.option('--retry-randomness', type=float,  help="multiply retry_after param by a number between 1 and retry_randomness")
-def recreate(tpu, zone, project, version, yes, dry_run, preempted, command, retry_after=None, retry_randomness=1, **kws):
+                                        "retry the creation command after this many seconds")
+@click.option('--retry-randomness', type=float,  help="multiply retry time by a number between 1 and retry_randomness")
+def recreate(tpu, zone, project, version, yes, dry_run, preempted, command, retry=None, retry_randomness=1.0, **kws):
   """
   Recreates a TPU, optionally switching the system software to the specified TF_VERSION.
   """
@@ -240,13 +240,13 @@ def recreate(tpu, zone, project, version, yes, dry_run, preempted, command, retr
       return
   do_step('Step 1: delete TPU...', delete, dry_run=dry_run)
   while do_step('Step 2: create TPU...', create, dry_run=dry_run) != 0:
-    if retry_after is None:
+    if retry is None:
       click.echo('TPU {} failed to create (is the region out of capacity?)'.format(tpunicorn.tpu.parse_tpu_id(tpu)), err=True)
       break
     n = random.uniform(1, retry_randomness)
     click.echo('TPU {} failed to create; trying again in {} minutes...'.format(tpunicorn.tpu.parse_tpu_id(tpu),
-                                                                               int((retry_after * n)//60)), err=True)
-    time.sleep(retry_after * n)
+                                                                               int((retry * n)//60)), err=True)
+    time.sleep(retry * n)
   do_step('Step 3: wait for TPU to become HEALTHY...', wait, dry_run=dry_run)
   if len(command) > 0:
     for i, cmd in enumerate(command):
