@@ -391,6 +391,30 @@ def delete_tpu_command(tpu, zone=None, project=None):
                            quiet=True,
                            )
 
+def start_tpu_command(tpu, zone=None, project=None):
+  if zone is None:
+    zone = parse_tpu_zone(tpu)
+  if project is None:
+    project = parse_tpu_project(tpu)
+  return build_commandline("gcloud compute tpus start",
+                           parse_tpu_id(tpu),
+                           zone=zone,
+                           project=project,
+                           quiet=True,
+                           )
+
+def stop_tpu_command(tpu, zone=None, project=None):
+  if zone is None:
+    zone = parse_tpu_zone(tpu)
+  if project is None:
+    project = parse_tpu_project(tpu)
+  return build_commandline("gcloud compute tpus stop",
+                           parse_tpu_id(tpu),
+                           zone=zone,
+                           project=project,
+                           quiet=True,
+                           )
+
 def reimage_tpu_command(tpu, zone=None, project=None, version=None):
   if zone is None:
     zone = parse_tpu_zone(tpu)

@@ -173,6 +173,56 @@ def delete(tpu, zone, project, yes, dry_run):
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 @click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
 @click.option('--project', type=click.STRING, default=None)
+@click.option('-y', '--yes', is_flag=True)
+@click.option('--dry-run', is_flag=True)
+def stop(tpu, zone, project, yes, dry_run):
+  tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone, project=project)
+  click.echo('Current status of TPU:')
+  print_tpu_status_headers()
+  print_tpu_status(tpu)
+  click.echo('')
+  stop = tpunicorn.stop_tpu_command(tpu, zone=zone, project=project)
+  start = tpunicorn.start_tpu_command(tpu, zone=zone, project=project)
+  if not yes:
+    print_step('Step 1: stop TPU.', stop)
+    if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
+      return
+  do_step('Step 1: stop TPU...', stop, dry_run=dry_run)
+  click.echo('TPU {} {} stopped.'.format(
+    tpunicorn.tpu.parse_tpu_id(tpu),
+    'would be' if dry_run else 'is'))
+  print_step('You {} restart the TPU with:'.format('could then' if dry_run else 'can'),
+    start)
+
+@cli.command()
+@click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
+@click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('--project', type=click.STRING, default=None)
+@click.option('-y', '--yes', is_flag=True)
+@click.option('--dry-run', is_flag=True)
+def start(tpu, zone, project, yes, dry_run):
+  tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone, project=project)
+  click.echo('Current status of TPU:')
+  print_tpu_status_headers()
+  print_tpu_status(tpu)
+  click.echo('')
+  stop = tpunicorn.stop_tpu_command(tpu, zone=zone, project=project)
+  start = tpunicorn.start_tpu_command(tpu, zone=zone, project=project)
+  if not yes:
+    print_step('Step 1: start TPU.', start)
+    if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
+      return
+  do_step('Step 1: start TPU...', start, dry_run=dry_run)
+  click.echo('TPU {} {} started.'.format(
+    tpunicorn.tpu.parse_tpu_id(tpu),
+    'would be' if dry_run else 'is'))
+  print_step('You {} stop the TPU with:'.format('could then' if dry_run else 'can'),
+    stop)
+
+@cli.command()
+@click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
+@click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('--project', type=click.STRING, default=None)
 @click.option('--version', type=click.STRING, metavar="<TF_VERSION>",
               help="By default, the TPU is reimaged with the same system software version."
                    " (This is handy as a quick way to reboot a TPU, freeing up all memory.)"
