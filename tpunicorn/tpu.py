@@ -30,6 +30,7 @@ def ero(x):
   return x
 
 def build_opt(k, v):
+  k = k.rstrip('_') # support reserved words, e.g. async_
   k = k.replace('_', '-').replace('--', '_')
   if v is True:
     return '--' + k
@@ -356,7 +357,7 @@ def format(tpu, spec=None, formatter=NamespaceFormatter):
     spec = get_default_format_spec(thin=len(format_widths()) == 0)
   return fmt.format(spec)
 
-def create_tpu_command(tpu, zone=None, project=None, version=None, description=None, preemptible=None):
+def create_tpu_command(tpu, zone=None, project=None, version=None, description=None, preemptible=None, async_=False):
   if zone is None:
     zone = parse_tpu_zone(tpu)
   if project is None:
@@ -377,9 +378,10 @@ def create_tpu_command(tpu, zone=None, project=None, version=None, description=N
                            accelerator_type=parse_tpu_type(tpu),
                            preemptible=preemptible,
                            description=description,
+                           async_=async_,
                            )
 
-def delete_tpu_command(tpu, zone=None, project=None):
+def delete_tpu_command(tpu, zone=None, project=None, async_=False):
   if zone is None:
     zone = parse_tpu_zone(tpu)
   if project is None:
@@ -389,9 +391,10 @@ def delete_tpu_command(tpu, zone=None, project=None):
                            zone=zone,
                            project=project,
                            quiet=True,
+                           async_=async_,
                            )
 
-def start_tpu_command(tpu, zone=None, project=None):
+def start_tpu_command(tpu, zone=None, project=None, async_=False):
   if zone is None:
     zone = parse_tpu_zone(tpu)
   if project is None:
@@ -401,9 +404,10 @@ def start_tpu_command(tpu, zone=None, project=None):
                            zone=zone,
                            project=project,
                            quiet=True,
+                           async_=async_,
                            )
 
-def stop_tpu_command(tpu, zone=None, project=None):
+def stop_tpu_command(tpu, zone=None, project=None, async_=False):
   if zone is None:
     zone = parse_tpu_zone(tpu)
   if project is None:
@@ -413,9 +417,10 @@ def stop_tpu_command(tpu, zone=None, project=None):
                            zone=zone,
                            project=project,
                            quiet=True,
+                           async_=async_,
                            )
 
-def reimage_tpu_command(tpu, zone=None, project=None, version=None):
+def reimage_tpu_command(tpu, zone=None, project=None, version=None, async_=False):
   if zone is None:
     zone = parse_tpu_zone(tpu)
   if project is None:
@@ -428,4 +433,5 @@ def reimage_tpu_command(tpu, zone=None, project=None, version=None):
                            project=project,
                            version=version,
                            quiet=True,
+                           async_=async_,
                            )

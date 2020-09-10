@@ -150,14 +150,15 @@ def do_step(label=None, command=None, dry_run=False, delay_after=1.0, args=(), k
 @click.option('--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
-def delete(tpu, zone, project, yes, dry_run):
+@click.option('--async', 'async_', is_flag=True)
+def delete(tpu, zone, project, yes, dry_run, async_):
   tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone, project=project)
   click.echo('Current status of TPU:')
   print_tpu_status_headers()
   print_tpu_status(tpu)
   click.echo('')
-  delete = tpunicorn.delete_tpu_command(tpu, zone=zone, project=project)
-  create = tpunicorn.create_tpu_command(tpu, zone=zone, project=project)
+  delete = tpunicorn.delete_tpu_command(tpu, zone=zone, project=project, async_=async_)
+  create = tpunicorn.create_tpu_command(tpu, zone=zone, project=project, async_=async_)
   if not yes:
     print_step('Step 1: delete TPU.', delete)
     if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
@@ -175,14 +176,15 @@ def delete(tpu, zone, project, yes, dry_run):
 @click.option('--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
-def stop(tpu, zone, project, yes, dry_run):
+@click.option('--async', 'async_', is_flag=True)
+def stop(tpu, zone, project, yes, dry_run, async_):
   tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone, project=project)
   click.echo('Current status of TPU:')
   print_tpu_status_headers()
   print_tpu_status(tpu)
   click.echo('')
-  stop = tpunicorn.stop_tpu_command(tpu, zone=zone, project=project)
-  start = tpunicorn.start_tpu_command(tpu, zone=zone, project=project)
+  stop = tpunicorn.stop_tpu_command(tpu, zone=zone, project=project, async_=async_)
+  start = tpunicorn.start_tpu_command(tpu, zone=zone, project=project, async_=async_)
   if not yes:
     print_step('Step 1: stop TPU.', stop)
     if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
@@ -200,14 +202,15 @@ def stop(tpu, zone, project, yes, dry_run):
 @click.option('--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
-def start(tpu, zone, project, yes, dry_run):
+@click.option('--async', 'async_', is_flag=True)
+def start(tpu, zone, project, yes, dry_run, async_):
   tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone, project=project)
   click.echo('Current status of TPU:')
   print_tpu_status_headers()
   print_tpu_status(tpu)
   click.echo('')
-  stop = tpunicorn.stop_tpu_command(tpu, zone=zone, project=project)
-  start = tpunicorn.start_tpu_command(tpu, zone=zone, project=project)
+  stop = tpunicorn.stop_tpu_command(tpu, zone=zone, project=project, async_=async_)
+  start = tpunicorn.start_tpu_command(tpu, zone=zone, project=project, async_=async_)
   if not yes:
     print_step('Step 1: start TPU.', start)
     if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
@@ -229,22 +232,25 @@ def start(tpu, zone, project, yes, dry_run):
                    " You can set this to use a specific version, e.g. `nightly`.")
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
-def reimage(tpu, zone, project, version, yes, dry_run):
+@click.option('--async', 'async_', is_flag=True)
+def reimage(tpu, zone, project, version, yes, dry_run, async_):
   """Reimages the OS on a TPU."""
   tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone, project=project)
-  reimage = tpunicorn.reimage_tpu_command(tpu, zone=zone, project=project, version=version)
+  reimage = tpunicorn.reimage_tpu_command(tpu, zone=zone, project=project, version=version, async_=async_)
   def wait():
     wait_healthy(tpu, zone=zone, project=project)
   if not yes:
     print_step('Step 1: reimage TPU.', reimage)
-    print_step('Step 2: wait until TPU is HEALTHY.', wait)
+    if not async_:
+      print_step('Step 2: wait until TPU is HEALTHY.', wait)
     if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
       return
   do_step('Step 1: reimage TPU...', reimage, dry_run=dry_run)
-  do_step('Step 2: wait for TPU to become HEALTHY...', wait, dry_run=dry_run)
-  click.echo('TPU {} {} ready for training.'.format(
-    tpunicorn.tpu.parse_tpu_id(tpu),
-    'would be' if dry_run else 'is'))
+  if not async_:
+    do_step('Step 2: wait for TPU to become HEALTHY...', wait, dry_run=dry_run)
+    click.echo('TPU {} {} ready for training.'.format(
+      tpunicorn.tpu.parse_tpu_id(tpu),
+      'would be' if dry_run else 'is'))
 
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
