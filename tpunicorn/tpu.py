@@ -102,12 +102,82 @@ def _determine_default_project(project=None):
 def get_default_project(project=None):
   return _determine_default_project(project=project)
 
+from collections import defaultdict
+
+country_abbrevs = {
+    'as': 'asia',
+    'eu': 'europe',
+    'us': 'us',
+}
+
+region_abbrevs = {
+    'w': 'west',
+    'e': 'east',
+    'c': 'central',
+}
+
+@ring.lru(expire=3600) # cache tpu abbrevs for an hour
+def get_zone_abbreviations(full_zone_names=None): # e.g. ['europe-west4-a']
+  if full_zone_names is None:
+    full_zone_names = get_tpu_zones()
+  if isinstance(full_zone_names, str):
+    full_zone_names = full_zone_names.split(',')
+  results = defaultdict(lambda: [])
+  for full_zone_name in full_zone_names:
+    country, region, zone_id = full_zone_name.split('-')
+    region, region_id = region[:-1], region[-1:]
+    assert int(region_id) in list(range(10))
+    for cshort, cfull in country_abbrevs.items():
+      for rshort, rfull in region_abbrevs.items():
+        if cfull == country and rfull == region:
+          # e.g. 'euw4a'
+          results[cshort + rshort + region_id + zone_id].append(full_zone_name)
+          # e.g. 'euw4'
+          results[cshort + rshort + region_id].append(full_zone_name)
+          # e.g. 'euw'
+          results[cshort + rshort].append(full_zone_name)
+          # e.g. 'eu'
+          results[cshort].append(full_zone_name)
+          # e.g. '4'
+          results[region_id].append(full_zone_name)
+          # e.g. '4a'
+          results[region_id + zone_id].append(full_zone_name)
+          # e.g. 'w4'
+          results[rshort + region_id].append(full_zone_name)
+          # e.g. 'w'
+          results[rshort].append(full_zone_name)
+          # e.g. 'west4'
+          results[rfull + region_id].append(full_zone_name)
+          # e.g. 'west'
+          results[rfull].append(full_zone_name)
+  return dict(results)
+
+def expand_zone_abbreviations(zone):
+  if zone is None:
+    return zone
+  results = []
+  for zone in zone.split(','):
+    for expansion in get_zone_abbreviations().get(zone, [zone]):
+      if expansion not in results:
+        results.append(expansion)
+  return ','.join(results)
+
+def get_tpu_zone_choices(project=None):
+  choices = []
+  for abbrev, expansions in get_zone_abbreviations().items():
+    for expansion in expansions:
+      if expansion not in choices:
+        choices.append(expansion)
+    if abbrev not in choices:
+      choices.append(abbrev)
+  return choices
+
 @ring.lru(expire=3600) # cache tpu zones for an hour
 def get_tpu_zones(project=None):
   zones = api.projects().locations().list(name='projects/'+get_default_project(project=project)).execute().get('locations', [])
-  return [zone['locationId'] for zone in zones]
+  zones = [zone['locationId'] for zone in zones]
+  return zones
 
-@ring.lru(expire=15) # cache tpu info for 15 seconds
 def fetch_tpus(zone=None, project=None):
   if zone is None:
     zones = get_tpu_zones(project=project)
@@ -115,10 +185,11 @@ def fetch_tpus(zone=None, project=None):
     zones = zone.split(',')
   tpus = []
   for zone in zones:
-    results = list_tpus(zone)
+    results = list_tpus(zone, project=project)
     tpus.extend(results)
   return tpus
 
+@ring.lru(expire=5) # cache tpu info for 5 seconds per zone
 def list_tpus(zone, project=None):
   if '/' not in zone:
     zone = 'projects/' + get_default_project(project=project) + '/locations/' + zone
@@ -126,29 +197,33 @@ def list_tpus(zone, project=None):
   return list(sorted(tpus, key=parse_tpu_index))
 
 def get_tpus(zone=None, project=None):
+  zone = expand_zone_abbreviations(zone)
   tpus = fetch_tpus(zone=zone, project=project)
   if zone is None:
     return tpus
   else:
-    return [tpu for tpu in tpus if '/{}/'.format(zone) in tpu['name']]
+    return [tpu for tpu in tpus if any(['/{}/'.format(zone) in tpu['name'] for zone in zone.split(',')])]
 
-def get_tpu(tpu, zone=None, project=None, silent=False):
+def get_tpu(tpu, zone=None, project=None, silent=False, multi=False):
+  tpus = get_tpus(zone=zone, project=project)
   if isinstance(tpu, dict):
     tpu = parse_tpu_id(tpu)
   if isinstance(tpu, str) and re.match('^[0-9]+$', tpu):
     tpu = int(tpu)
   if isinstance(tpu, int):
     which = 'index'
-    tpus = [x for x in get_tpus(zone=zone, project=project) if parse_tpu_index(x) == tpu]
+    tpus = [x for x in tpus if parse_tpu_index(x) == tpu]
   else:
     which = 'id'
-    tpus = [x for x in get_tpus(zone=zone, project=project) if parse_tpu_id(x) == tpu]
-  if len(tpus) > 1:
-    raise ValueError("Multiple TPUs matched {} {!r}. Try specifying --zone".format(which, tpu))
+    tpus = [x for x in tpus if parse_tpu_id(x) == tpu]
   if len(tpus) <= 0:
     if silent:
-      return None
-    raise ValueError("No TPUs matched {} {!r}".format(which, tpu))
+      return [] if multi else None
+    raise ValueError("No TPUs matched {} {!r} in zone {!r} of project {!r}".format(which, tpu, zone, project))
+  if multi:
+    return tpus
+  if len(tpus) > 1:
+    raise ValueError("Multiple TPUs matched {} {!r}. Try specifying --zone or --project".format(which, tpu))
   return tpus[0]
 
 from string import Formatter
@@ -358,9 +433,9 @@ def format(tpu, spec=None, formatter=NamespaceFormatter):
   return fmt.format(spec)
 
 def create_tpu_command(tpu, zone=None, project=None, version=None, description=None, preemptible=None, async_=False):
-  if zone is None:
+  if True or zone is None:
     zone = parse_tpu_zone(tpu)
-  if project is None:
+  if True or project is None:
     project = parse_tpu_project(tpu)
   if version is None:
     version = parse_tpu_version(tpu)
@@ -382,9 +457,9 @@ def create_tpu_command(tpu, zone=None, project=None, version=None, description=N
                            )
 
 def delete_tpu_command(tpu, zone=None, project=None, async_=False):
-  if zone is None:
+  if True or zone is None:
     zone = parse_tpu_zone(tpu)
-  if project is None:
+  if True or project is None:
     project = parse_tpu_project(tpu)
   return build_commandline("gcloud compute tpus delete",
                            parse_tpu_id(tpu),
@@ -395,9 +470,9 @@ def delete_tpu_command(tpu, zone=None, project=None, async_=False):
                            )
 
 def start_tpu_command(tpu, zone=None, project=None, async_=False):
-  if zone is None:
+  if True or zone is None:
     zone = parse_tpu_zone(tpu)
-  if project is None:
+  if True or project is None:
     project = parse_tpu_project(tpu)
   return build_commandline("gcloud compute tpus start",
                            parse_tpu_id(tpu),
@@ -408,9 +483,9 @@ def start_tpu_command(tpu, zone=None, project=None, async_=False):
                            )
 
 def stop_tpu_command(tpu, zone=None, project=None, async_=False):
-  if zone is None:
+  if True or zone is None:
     zone = parse_tpu_zone(tpu)
-  if project is None:
+  if True or project is None:
     project = parse_tpu_project(tpu)
   return build_commandline("gcloud compute tpus stop",
                            parse_tpu_id(tpu),
@@ -421,9 +496,9 @@ def stop_tpu_command(tpu, zone=None, project=None, async_=False):
                            )
 
 def reimage_tpu_command(tpu, zone=None, project=None, version=None, async_=False):
-  if zone is None:
+  if True or zone is None:
     zone = parse_tpu_zone(tpu)
-  if project is None:
+  if True or project is None:
     project = parse_tpu_project(tpu)
   if version is None:
     version = parse_tpu_version(tpu)
