@@ -59,10 +59,12 @@ def print_tpus_status(zone=None, project=None, format='text', color=True):
       print_tpu_status(tpu, color=color, project=project)
 
 @cli.command()
-def top():
+@click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('--project', type=click.STRING, default=None)
+def top(zone, project):
   while True:
     click.clear()
-    print_tpus_status()
+    print_tpus_status(zone=zone, project=project)
     time.sleep(5.0)
 
 @cli.command("list")
