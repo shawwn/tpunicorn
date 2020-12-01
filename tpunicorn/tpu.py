@@ -104,8 +104,13 @@ def get_default_project(project=None):
 
 @ring.lru(expire=3600) # cache tpu zones for an hour
 def get_tpu_zones(project=None):
-  zones = api.projects().locations().list(name='projects/'+get_default_project(project=project)).execute().get('locations', [])
-  return [zone['locationId'] for zone in zones]
+  project = get_default_project(project=project)
+  if project is None:
+    # punt with some default TPU zones.
+    return 'asia-east1-c|europe-west4-a|us-central1-a|us-central1-b|us-central1-c|us-central1-f'.split('|')
+  else:
+    zones = api.projects().locations().list(name='projects/'+project).execute().get('locations', [])
+    return [zone['locationId'] for zone in zones]
 
 @ring.lru(expire=15) # cache tpu info for 15 seconds
 def fetch_tpus(zone=None, project=None):
