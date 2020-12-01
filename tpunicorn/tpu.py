@@ -176,9 +176,9 @@ class NamespaceFormatter(Formatter):
 from collections import defaultdict
 
 @ring.lru(expire=1) # seconds
-def format_widths():
+def format_widths(project=None):
   headers = format_headers()
-  tpus = get_tpus()
+  tpus = get_tpus(project=project)
   r = defaultdict(int)
   for tpu in tpus:
     args = _format_args(tpu)
@@ -321,9 +321,9 @@ def parse_tpu_type(tpu):
 def parse_tpu_description(tpu):
   return tpu.get('description', None)
 
-def format_args(tpu):
+def format_args(tpu, project=None):
   r = _format_args(tpu)
-  r.update(format_widths())
+  r.update(format_widths(project=project))
   return r
 
 def get_default_format_specs(thin=False):
@@ -349,17 +349,17 @@ def get_default_format_specs(thin=False):
 def get_default_format_spec(thin=False):
   return ' '.join(get_default_format_specs(thin=thin))
 
-def format(tpu, spec=None, formatter=NamespaceFormatter):
+def format(tpu, spec=None, formatter=NamespaceFormatter, project=None):
   if tpu.get('kind', 'tpu') == 'tpu':
-    args = format_args(tpu)
+    args = format_args(tpu, project=project)
   else:
     args = {}
     args.update(tpu)
-    args.update(format_widths())
+    args.update(format_widths(project=project))
   args = {k: v if v is not None else '' for k, v in args.items()}
   fmt = formatter(args)
   if spec is None:
-    spec = get_default_format_spec(thin=len(format_widths()) == 0)
+    spec = get_default_format_spec(thin=len(format_widths(project=project)) == 0)
   return fmt.format(spec)
 
 def create_tpu_command(tpu, zone=None, project=None, version=None, description=None, preemptible=None, async_=False):

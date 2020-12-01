@@ -23,23 +23,23 @@ def cli(ctx, **kws):
     logging.setLevel(pylogging.DEBUG)
   logging.debug('%r', sys.argv)
 
-def print_tpu_status_headers(color=True):
-  message = tpunicorn.format(tpunicorn.format_headers())
+def print_tpu_status_headers(color=True, project=None):
+  message = tpunicorn.format(tpunicorn.format_headers(), project=project)
   if color:
     click.secho(message, bold=color)
   else:
     click.echo(message)
 
-def print_tpu_status(tpu, format='text', color=True):
+def print_tpu_status(tpu, format='text', color=True, project=None):
   if format == 'json':
     click.echo(json.dumps(tpu))
     return
-  message = tpunicorn.format(tpu)
+  message = tpunicorn.format(tpu, project=project)
   if not color:
     click.echo(message)
   else:
-    status = tpunicorn.format(tpu, '{status}')
-    health = tpunicorn.format(tpu, '{health}')
+    status = tpunicorn.format(tpu, '{status}', project=project)
+    health = tpunicorn.format(tpu, '{health}', project=project)
     if status == 'READY' and health == 'HEALTHY':
       click.secho(message, fg='green')
       return 'HEALTHY'
@@ -54,9 +54,9 @@ def print_tpus_status(zone=None, project=None, format='text', color=True):
     click.echo(json.dumps(tpus))
   else:
     assert format == 'text'
-    print_tpu_status_headers(color=color)
+    print_tpu_status_headers(color=color, project=project)
     for tpu in tpus:
-      print_tpu_status(tpu, color=color)
+      print_tpu_status(tpu, color=color, project=project)
 
 @cli.command()
 def top():
