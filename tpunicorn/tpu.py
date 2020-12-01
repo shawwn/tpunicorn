@@ -120,7 +120,7 @@ def fetch_tpus(zone=None, project=None):
     zones = zone.split(',')
   tpus = []
   for zone in zones:
-    results = list_tpus(zone)
+    results = list_tpus(zone, project=project)
     tpus.extend(results)
   return tpus
 
