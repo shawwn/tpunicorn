@@ -73,6 +73,110 @@ def parse_tpu_index(tpu):
     idx = int(idx[0])
   return idx
 
+def parse_tpu_accelerator_type(tpu):
+  fqn = tpu if isinstance(tpu, str) else tpu['name']
+  accelerator_type = re.findall(r'(v[0-9]+[-][0-9]+)', fqn)
+  if len(accelerator_type) <= 0:
+    return "v2-8"
+  else:
+    return accelerator_type[0]
+
+def parse_tpu_zone(tpu):
+  fqn = tpu if isinstance(tpu, str) else tpu['name']
+  zone_abbreviation = re.findall(r'[-]([^-]+)[-](?:v[0-9]+[-][0-9]+)', fqn)
+  # I might clean this up someday, but probably not. Sorry that this looks so cryptic.
+  results = [[expand_zone_abbreviations(k), re.findall(r'\b{}\b'.format(k), fqn)]
+      for k, v in get_zone_abbreviations(only_unambiguous_results=True).items()
+      if len(v) <= 1]
+  for zone, matched in results:
+    if matched:
+      return zone
+
+from collections import defaultdict
+
+country_abbrevs = {
+    'as': 'asia',
+    'eu': 'europe',
+    'au': 'austrailia',
+    'us': 'us',
+    'na': 'northamerica',
+    'sa': 'southamerica',
+}
+
+region_abbrevs = {
+    'n': 'north',
+    's': 'south',
+    'e': 'east',
+    'w': 'west',
+    'c': 'central',
+    'ne': 'northeast',
+    'nw': 'northwest',
+    'se': 'southeast',
+    'sw': 'southwest',
+}
+
+@ring.lru(expire=3600) # cache tpu abbrevs for an hour
+def get_zone_abbreviations(full_zone_names=None, only_unambiguous_results=False): # e.g. ['europe-west4-a']
+  if full_zone_names is None:
+    full_zone_names = get_tpu_zones()
+  if isinstance(full_zone_names, str):
+    full_zone_names = full_zone_names.split(',')
+  results = defaultdict(lambda: [])
+  for full_zone_name in full_zone_names:
+    country, region, zone_id = full_zone_name.split('-')
+    region, region_id = region[:-1], region[-1:]
+    assert int(region_id) in list(range(10))
+    for cshort, cfull in country_abbrevs.items():
+      for rshort, rfull in region_abbrevs.items():
+        if cfull == country and rfull == region:
+          # e.g. 'euw4a'
+          results[cshort + rshort + region_id + zone_id].append(full_zone_name)
+          if not only_unambiguous_results:
+            # e.g. 'euw4'
+            results[cshort + rshort + region_id].append(full_zone_name)
+            # e.g. 'euw'
+            results[cshort + rshort].append(full_zone_name)
+            # e.g. 'eu'
+            results[cshort].append(full_zone_name)
+            # e.g. '4'
+            results[region_id].append(full_zone_name)
+            # e.g. '4a'
+            results[region_id + zone_id].append(full_zone_name)
+            # e.g. 'w4'
+            results[rshort + region_id].append(full_zone_name)
+            # e.g. 'w'
+            results[rshort].append(full_zone_name)
+            # e.g. 'west4'
+            results[rfull + region_id].append(full_zone_name)
+            # e.g. 'west'
+            results[rfull].append(full_zone_name)
+  return dict(results)
+
+def infer_zone_abbreviation(zone):
+  # I might clean this up someday, but probably not. Sorry that this looks so cryptic.
+  return list(get_zone_abbreviations(zone, only_unambiguous_results=True).keys())[0]
+
+def expand_zone_abbreviations(zone):
+  if zone is None:
+    return zone
+  results = []
+  for zone in zone.split(','):
+    for expansion in get_zone_abbreviations().get(zone, [zone]):
+      if expansion not in results:
+        results.append(expansion)
+  return ','.join(results)
+
+def get_tpu_zone_choices(project=None):
+  choices = []
+  for abbrev, expansions in get_zone_abbreviations().items():
+    for expansion in expansions:
+      if expansion not in choices:
+        choices.append(expansion)
+    if abbrev not in choices:
+      choices.append(abbrev)
+  return choices
+
+
 def parse_tpu_network(tpu):
   net = tpu if isinstance(tpu, str) else tpu['network']
   return net.split('/')[-1]
@@ -362,25 +466,33 @@ def format(tpu, spec=None, formatter=NamespaceFormatter, project=None):
     spec = get_default_format_spec(thin=len(format_widths(project=project)) == 0)
   return fmt.format(spec)
 
-def create_tpu_command(tpu, zone=None, project=None, version=None, description=None, preemptible=None, async_=False):
-  if zone is None:
-    zone = parse_tpu_zone(tpu)
-  if project is None:
-    project = parse_tpu_project(tpu)
-  if version is None:
-    version = parse_tpu_version(tpu)
-  if description is None:
-    description = parse_tpu_description(tpu)
-  if preemptible is None:
-    preemptible = True if parse_tpu_preemptible(tpu) else None
+def create_tpu_command(tpu=None, zone=None, version=None, accelerator_type=None, project=None, description=None, network=None, range=None, preemptible=None, async_=False):
+  name = parse_tpu_id(tpu)
+  if not isinstance(tpu, str):
+    if zone is None:
+      zone = parse_tpu_zone(tpu)
+    if project is None:
+      project = parse_tpu_project(tpu)
+    if version is None:
+      version = parse_tpu_version(tpu)
+    if accelerator_type is None:
+      accelerator_type = parse_tpu_type(tpu)
+    if description is None:
+      description = parse_tpu_description(tpu)
+    if preemptible is None:
+      preemptible = True if parse_tpu_preemptible(tpu) else None
+    if network is None:
+      network = parse_tpu_network(tpu)
+    if range is None:
+      range = parse_tpu_range(tpu)
   return build_commandline("gcloud compute tpus create",
-                           parse_tpu_id(tpu),
+                           name,
                            zone=zone,
                            project=project,
-                           network=parse_tpu_network(tpu),
-                           range=parse_tpu_range(tpu),
+                           network=network,
+                           range=range,
                            version=version,
-                           accelerator_type=parse_tpu_type(tpu),
+                           accelerator_type=accelerator_type,
                            preemptible=preemptible,
                            description=description,
                            async_=async_,

@@ -5,6 +5,7 @@ import sys
 import os
 import time
 import random
+import math
 from pprint import pprint as pp
 
 import logging as pylogging
@@ -148,6 +149,74 @@ def do_step(label=None, command=None, dry_run=False, delay_after=1.0, args=(), k
         result = os.system(command)
       time.sleep(delay_after)
   return result
+
+@cli.command()
+@click.argument('tpu', type=click.STRING, metavar="[TPU; default\"automatic\"]", autocompletion=complete_tpu_id)
+@click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('-v', '--version', type=click.STRING, metavar="[VERSION; default=\"1.15.3\"]", default="1.15.3",
+              help="By default, the TPU is imaged with TF version 1.15.3, as we've found this to be the most stable over time."
+                   " If your TPU is giving strange errors, try setting this to `nightly` and pray to moloch.")
+@click.option('-a', '--accelerator-type', metavar="[ACCELERATOR_TYPE; default=\"v2-8\"]", type=click.STRING, default=None)
+@click.option('--async', 'async_', is_flag=True)
+@click.option('-d', '--description', metavar="DESCRIPTION", type=click.STRING, default=None)
+@click.option('-n', '--network', metavar="[NETWORK; default=\"default\"]", type=click.STRING, default="default")
+@click.option('-p/-np', '--preemptible/--non-preemptible', default=True)
+@click.option('-r', '--range', metavar="[RANGE]", type=click.STRING, default=None)
+@click.option('-p', '--project', metavar="[PROJECT]", type=click.STRING, default=None)
+@click.option('-y', '--yes', is_flag=True)
+@click.option('--dry-run', is_flag=True)
+def create(tpu, zone, version, accelerator_type, async_, description, network, preemptible, range, project, yes, dry_run):
+  index = tpunicorn.tpu.parse_tpu_index(tpu)
+  if accelerator_type is None:
+    accelerator_type = tpunicorn.tpu.parse_tpu_accelerator_type(tpu)
+  # parse the TPU type and core count.
+  tpu_type, cores = accelerator_type.rsplit("-", 1)
+  tpu_type = tpu_type.lower()
+  cores = int(cores)
+  # give reasonable defaults for TFRC members
+  if zone is None:
+    zone = tpunicorn.tpu.parse_tpu_zone(tpu)
+  if zone is None:
+    if tpu_type == "v2" and cores == 8:
+      zone = "us-central1-f"
+    elif tpu_type == "v2" and cores > 8:
+      zone = "us-central1-a"
+    elif tpu_type == "v3":
+      zone = "europe-west4-a"
+    else:
+      raise ValueError("Please specify --zone")
+  if range is None and index >= 0:
+    if cores == 8:
+      range = "10.48.{i}.0/29".format(i=index)
+    else:
+      i=index + 2
+      cidr=int(32 + 2 - math.log2(cores))
+      range="10.{i}.0.0/{cidr}".format(i=i, cidr=cidr)
+  if range.startswith("10.48.") and cores > 8:
+    raise ValueError("The range {range!r} conflicts with the default 10.48.* range of v2-8's and v3-8's. I decided to raise an error rather than a warning, because we rely on this specific range for our own internal networking. If you're making a TPU pod, try a different index other than {index}. If you really, really wanted to use 10.48.* for you TPU pods, I'm very sorry; ping me on twitter (@theshawwn) and I'll change this.".format(range=range, index=index))
+  try:
+    index = int(tpu)
+    # the TPU name is just an integer, so try to build a new name
+    # automatically for convenience.
+    zone_abbrev = tpunicorn.tpu.infer_zone_abbreviation(zone)
+    tpu = "tpu-{accelerator_type}-{zone_abbrev}-{index}".format(
+        accelerator_type=accelerator_type,
+        zone_abbrev=zone_abbrev,
+        index=index)
+  except ValueError:
+    pass
+  if project is None:
+    project = tpunicorn.tpu.get_default_project()
+  create = tpunicorn.create_tpu_command(tpu, zone=zone, version=version, accelerator_type=accelerator_type, async_=async_, description=description, network=network, preemptible=preemptible, range=range, project=project)
+  if not yes:
+    print_step('Step 1: create TPU.', create)
+    if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
+      return
+  do_step('Step 1: create TPU...', create, dry_run=dry_run)
+  click.echo('TPU {} {} created.'.format(
+    tpunicorn.tpu.parse_tpu_id(tpu),
+    'would be' if dry_run else 'is'))
+
 
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
