@@ -13,7 +13,10 @@ logging.setLevel(pylogging.WARNING)
 
 from tpunicorn._version import binary_names
 
+# https://stackoverflow.com/questions/58666831/how-to-implement-version-using-python-click/58666832#58666832
+
 @click.group()
+@click.version_option(tpunicorn._version.__version__)
 @click.option('-v', '--verbose', is_flag=True)
 @click.pass_context
 def cli(ctx, **kws):
