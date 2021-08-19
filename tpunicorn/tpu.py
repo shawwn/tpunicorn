@@ -131,14 +131,15 @@ def parse_tpu_accelerator_type(tpu):
 
 def parse_tpu_zone(tpu):
   fqn = tpu if isinstance(tpu, str) else tpu['name']
-  #zone_abbreviation = re.findall(r'[-]([^-]+)[-](?:v[0-9]+[-][0-9]+)', fqn)
-  # I might clean this up someday, but probably not. Sorry that this looks so cryptic.
-  results = [[expand_zone_abbreviations(k), re.findall(r'\b{}\b'.format(k), fqn)]
-      for k, v in get_zone_abbreviations(only_unambiguous_results=True).items()
-      if len(v) <= 1]
-  for zone, matched in results:
-    if matched:
-      return zone
+  if isinstance(tpu, str):
+    #zone_abbreviation = re.findall(r'[-]([^-]+)[-](?:v[0-9]+[-][0-9]+)', fqn)
+    # I might clean this up someday, but probably not. Sorry that this looks so cryptic.
+    results = [[expand_zone_abbreviations(k), re.findall(r'\b{}\b'.format(k), fqn)] for k, v in get_zone_abbreviations(only_unambiguous_results=True).items() if len(v) <= 1]
+    for zone, matched in results:
+      if matched:
+        return zone
+  else:
+    return fqn.split('/')[-3]
 
 from collections import defaultdict
 
