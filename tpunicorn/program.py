@@ -12,13 +12,14 @@ import logging as pylogging
 logging = tpunicorn.logger
 logging.setLevel(pylogging.WARNING)
 
-from tpunicorn._version import binary_names
+from ._version import binary_names
 
 # https://stackoverflow.com/questions/58666831/how-to-implement-version-using-python-click/58666832#58666832
 
 @click.group()
 @click.version_option(tpunicorn._version.__version__)
-@click.option('-v', '--verbose', is_flag=True)
+@click.option('-vv', '--verbose', is_flag=True)
+@click.option('-c', '--configuration', type=click.STRING, default=None)
 @click.pass_context
 def cli(ctx, **kws):
   ctx.obj = kws
@@ -26,6 +27,10 @@ def cli(ctx, **kws):
   if verbose:
     logging.setLevel(pylogging.DEBUG)
   logging.debug('%r', sys.argv)
+  configuration = ctx.obj['configuration']
+  if configuration is not None:
+    logging.info('Setting CLOUDSDK_ACTIVE_CONFIG_NAME=%s', configuration)
+    os.environ['CLOUDSDK_ACTIVE_CONFIG_NAME'] = configuration
 
 def print_tpu_status_headers(color=True, project=None):
   message = tpunicorn.format(tpunicorn.format_headers(), project=project)
@@ -63,7 +68,7 @@ def print_tpus_status(zone=None, project=None, format='text', color=True):
       print_tpu_status(tpu, color=color, project=project)
 
 @cli.command()
-@click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
 @click.option('--project', type=click.STRING, default=None)
 def top(zone, project):
   while True:
@@ -72,10 +77,10 @@ def top(zone, project):
     time.sleep(5.0)
 
 @cli.command("list")
-@click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
 @click.option('--project', type=click.STRING, default=None)
 @click.option('--format', type=click.Choice(['text', 'json']), default='text')
-@click.option('-c/-nc', '--color/--no-color', default=True)
+@click.option('-color/-nc', '--color/--no-color', default=True)
 @click.option('-t', '--tpu', type=click.STRING, help="List a specific TPU by id.", multiple=True)
 @click.option('-s', '--silent', is_flag=True, help="If listing a specific TPU by ID, and there is no such TPU, don't throw an error.")
 def list_tpus(zone, project, format, color, tpu, silent):
@@ -97,7 +102,7 @@ def complete_tpu_id(ctx, args, incomplete, zone=None, project=None):
 
 # @cli.command()
 # @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
-# @click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+# @click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
 # @click.option('--project', type=click.STRING, default=None)
 # def create(tpu, zone, project):
 #   tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone, project=project)
@@ -147,26 +152,36 @@ def do_step(label=None, command=None, dry_run=False, delay_after=1.0, args=(), k
         command(*args, **kwargs)
       else:
         result = os.system(command)
+        if result != 0:
+          sys.exit(result)
       time.sleep(delay_after)
   return result
 
 @cli.command()
-@click.argument('tpu', type=click.STRING, metavar="[TPU; default\"automatic\"]", autocompletion=complete_tpu_id)
-@click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
-@click.option('-v', '--version', type=click.STRING, metavar="[VERSION; default=\"1.15.3\"]", default="1.15.3",
-              help="By default, the TPU is imaged with TF version 1.15.3, as we've found this to be the most stable over time."
-                   " If your TPU is giving strange errors, try setting this to `nightly` and pray to moloch.")
+@click.argument('tpu', type=click.STRING, metavar="[TPU; default=\"0+\"]", default="0+", autocompletion=complete_tpu_id)
+@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('-v', '--version', type=click.STRING, metavar="[VERSION; default=\"v2-alpha\"]", default="v2-alpha",
+              help="By default, the TPU version is v2-alpha, which means it's created as a TPU VM."
+              " If you want to create a regular Tensorflow TPU, you can do so with e.g. --version nightly or --version 1.15.3")
 @click.option('-a', '--accelerator-type', metavar="[ACCELERATOR_TYPE; default=\"v2-8\"]", type=click.STRING, default=None)
+@click.option('-dd', '--data-disk', metavar="[DATA_DISK]", type=click.STRING, default=None)
 @click.option('--async', 'async_', is_flag=True)
 @click.option('-d', '--description', metavar="DESCRIPTION", type=click.STRING, default=None)
 @click.option('-n', '--network', metavar="[NETWORK; default=\"default\"]", type=click.STRING, default="default")
-@click.option('-p/-np', '--preemptible/--non-preemptible', default=True)
+@click.option('-sn', '--subnetwork', metavar="[SUBNETWORK]", type=click.STRING, default=None)
+@click.option('-pre/-np', '--preemptible/--non-preemptible', default=True)
 @click.option('-r', '--range', metavar="[RANGE]", type=click.STRING, default=None)
 @click.option('-p', '--project', metavar="[PROJECT]", type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
-def create(tpu, zone, version, accelerator_type, async_, description, network, preemptible, range, project, yes, dry_run):
-  index = tpunicorn.tpu.parse_tpu_index(tpu)
+@click.pass_context
+def create(ctx, tpu, zone, version, accelerator_type, data_disk, async_, description, network, subnetwork, preemptible, range, project, yes, dry_run):
+  if tpu.endswith('+'):
+    index = int(tpu[:-1])
+    index = tpunicorn.tpu.get_next_available_tpu_index(index, project=project, zone=zone)
+    tpu = str(index)
+  else:
+    index = tpunicorn.tpu.parse_tpu_index(tpu)
   if accelerator_type is None:
     accelerator_type = tpunicorn.tpu.parse_tpu_accelerator_type(tpu)
   # parse the TPU type and core count.
@@ -185,14 +200,17 @@ def create(tpu, zone, version, accelerator_type, async_, description, network, p
       zone = "europe-west4-a"
     else:
       raise ValueError("Please specify --zone")
-  if range is None and index >= 0:
+  is_v2 = (version is not None) and version.startswith('v2')
+  if not is_v2 and data_disk is not None:
+    raise ValueError("--data-disk can only be specified for TPU VMs; try --version v2-alpha")
+  if range is None and index >= 0 and not is_v2: # --range appears to be broken on TPU VMs for now; don't give a default
     if cores == 8:
       range = "10.48.{i}.0/29".format(i=index)
     else:
       i=index + 2
       cidr=int(32 + 2 - math.log2(cores))
       range="10.{i}.0.0/{cidr}".format(i=i, cidr=cidr)
-  if range.startswith("10.48.") and cores > 8:
+  if range is not None and range.startswith("10.48.") and cores > 8:
     raise ValueError("The range {range!r} conflicts with the default 10.48.* range of v2-8's and v3-8's. I decided to raise an error rather than a warning, because we rely on this specific range for our own internal networking. If you're making a TPU pod, try a different index other than {index}. If you really, really wanted to use 10.48.* for you TPU pods, I'm very sorry; ping me on twitter (@theshawwn) and I'll change this.".format(range=range, index=index))
   try:
     index = int(tpu)
@@ -207,7 +225,7 @@ def create(tpu, zone, version, accelerator_type, async_, description, network, p
     pass
   if project is None:
     project = tpunicorn.tpu.get_default_project()
-  create = tpunicorn.create_tpu_command(tpu, zone=zone, version=version, accelerator_type=accelerator_type, async_=async_, description=description, network=network, preemptible=preemptible, range=range, project=project)
+  create = tpunicorn.create_tpu_command(tpu, zone=zone, version=version, accelerator_type=accelerator_type, async_=async_, description=description, network=network, subnetwork=subnetwork, preemptible=preemptible, range=range, project=project, data_disk=data_disk)
   if not yes:
     print_step('Step 1: create TPU.', create)
     if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
@@ -220,7 +238,7 @@ def create(tpu, zone, version, accelerator_type, async_, description, network, p
 
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
-@click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
 @click.option('--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
@@ -246,7 +264,7 @@ def delete(tpu, zone, project, yes, dry_run, async_):
 
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
-@click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
 @click.option('--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
@@ -272,7 +290,7 @@ def stop(tpu, zone, project, yes, dry_run, async_):
 
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
-@click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
 @click.option('--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
@@ -298,7 +316,7 @@ def start(tpu, zone, project, yes, dry_run, async_):
 
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
-@click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
 @click.option('--project', type=click.STRING, default=None)
 @click.option('--version', type=click.STRING, metavar="<TF_VERSION>",
               help="By default, the TPU is reimaged with the same system software version."
@@ -328,7 +346,7 @@ def reimage(tpu, zone, project, version, yes, dry_run, async_):
 
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
-@click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
 @click.option('--project', type=click.STRING, default=None)
 @click.option('--version', type=click.STRING, metavar="<TF_VERSION>",
               help="By default, the TPU is recreated with the same system software version."
@@ -387,7 +405,7 @@ def recreate(tpu, zone, project, version, yes, dry_run, preempted, command, retr
 
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
-@click.option('--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
 @click.option('--project', type=click.STRING, default=None)
 @click.option('--dry-run', is_flag=True)
 @click.option('-i', '--interval', type=click.INT, default=30, metavar='<seconds>',
@@ -464,6 +482,21 @@ def install_completion(shell, yes, dry_run):
       return
   for label, command, args, kwargs in tasks:
     do_step(label + '..', command, args=args, kwargs=kwargs)
+
+@cli.group()
+@click.pass_context
+def vm(ctx):
+  import pdb; pdb.set_trace()
+  pass
+
+
+# @vm.command(name='create')
+# @click.pass_context
+# def vm_create(ctx, *args, **kws):
+#   return ctx.forward(create, ctx, *args, **kws)
+
+vm.add_command(create)
+
 
 def main(*args, prog_name='tpunicorn', auto_envvar_prefix='TPUNICORN', **kws):
   cli.main(*args, prog_name=prog_name, auto_envvar_prefix=auto_envvar_prefix, **kws)
