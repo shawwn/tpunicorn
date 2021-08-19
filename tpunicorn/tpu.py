@@ -264,7 +264,7 @@ def refresh_creds(creds=None, request=None):
 
 def get_creds(creds=None):
   creds = get_default_creds(creds)
-  if creds is not None and creds.expired:
+  if creds is not None and (creds.expired or not creds.token):
     refresh_creds(creds)
   return creds
 
