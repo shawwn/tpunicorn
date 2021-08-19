@@ -43,6 +43,8 @@ setuptools.setup(
         'moment>=0.0.10',
         'google-auth>=0.11.0',
         'google-api-python-client>=1.7.11',
+        'cachier>=1.5.0',
+        'braceexpand>=0.1.7',
     ],
     packages=packages,
     entry_points={

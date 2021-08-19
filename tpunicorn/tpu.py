@@ -449,12 +449,7 @@ def request_urls(path, api='tpu', apiVersion='v2alpha1', **kws):
 
 from concurrent import futures
 
-import pyjq
-
-def j(x, *selectors):
-  return x if not selectors else j(getattr(pyjq, {'': 'apply', "f": "first", "a": "all", 'p': 'apply'}.get(selectors[0], selectors[0]))(selectors[1], x), *selectors[2:])
-
-def request(path, selector=None, api='tpu', apiVersion=None, headers=None, session=None, project=None, **kws):
+def request(path, api='tpu', apiVersion=None, headers=None, session=None, project=None, **kws):
   if apiVersion is None:
     if api == 'tpu':
       apiVersion = 'v2alpha1'
@@ -474,8 +469,6 @@ def request(path, selector=None, api='tpu', apiVersion=None, headers=None, sessi
   with futures.ThreadPoolExecutor() as executor:
     result = []
     for res in executor.map(fetcher, urls):
-      if selector is not None:
-        res = j(res, *(['all', selector] if not isinstance(selector, (list, tuple)) else selector))
       result.append(res)
     if len(result) <= 1:
       return result[0]
