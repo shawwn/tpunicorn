@@ -1,4 +1,19 @@
 import click
+
+class CustomFormatter(click.HelpFormatter):
+    def write_heading(self, heading):
+        heading = click.style(heading, fg="yellow")
+        return super().write_heading(heading)
+
+class CustomContext(click.Context):
+    def make_formatter(self):
+        """Creates the formatter for the help and usage output."""
+        return CustomFormatter(
+            width=self.terminal_width, max_width=self.max_content_width
+        )
+
+click.Context = click.core.Context = CustomContext
+
 import tpunicorn
 import json
 import sys
