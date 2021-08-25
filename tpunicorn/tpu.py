@@ -888,3 +888,15 @@ def reimage_tpu_command(tpu, zone=None, project=None, version=None, async_=False
                            quiet=True,
                            async_=async_,
                            )
+
+def ssh_tpu_command(tpu, zone=None, project=None, ssh_flag=None):
+  if zone is None:
+    zone = parse_tpu_zone(tpu)
+  if project is None:
+    project = parse_tpu_project(tpu)
+  return build_commandline("gcloud alpha compute tpus tpu-vm ssh",
+                           parse_tpu_id(tpu),
+                           zone=zone,
+                           project=project,
+                           ssh_flag=ssh_flag,
+                           )

@@ -438,6 +438,29 @@ def recreate(tpu, zone, project, version, yes, dry_run, preempted, command, retr
     tpunicorn.tpu.parse_tpu_id(tpu),
     'would be' if dry_run else 'is'))
 
+
+@cli.command()
+@click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
+@tpu_zone_option()
+@click.option('-p', '--project', type=click.STRING, default=None)
+@click.option('-y', '--yes', is_flag=True)
+@click.option('--dry-run', is_flag=True)
+@click.option('-l', '--ssh-flag', type=click.STRING, default=None)
+def ssh(tpu, zone, project, yes, dry_run, ssh_flag):
+  """SSH into a TPU VM."""
+  tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone, project=project)
+  click.echo('Current status of TPU {} as of {}:'.format(tpunicorn.tpu.parse_tpu_id(tpu), tpunicorn.tpu.get_timestamp()))
+  print_tpu_status_headers()
+  print_tpu_status(tpu)
+  click.echo('')
+  cmd = tpunicorn.tpu.ssh_tpu_command(tpu, zone=zone, project=project, ssh_flag=ssh_flag)
+  if not yes:
+    print_step('Step 1: ssh into TPU.', cmd)
+    if not click.confirm('Proceed? {}'.format('(dry run)' if dry_run else '')):
+      return
+  do_step('Step 1: ssh into TPU...', cmd, dry_run=dry_run)
+
+
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 @tpu_zone_option()
