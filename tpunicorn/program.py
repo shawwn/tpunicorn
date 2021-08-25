@@ -69,7 +69,7 @@ def print_tpus_status(zone=None, project=None, format='text', color=True):
 
 @cli.command()
 @click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
-@click.option('--project', type=click.STRING, default=None)
+@click.option('-p', '--project', type=click.STRING, default=None)
 def top(zone, project):
   while True:
     click.clear()
@@ -78,8 +78,8 @@ def top(zone, project):
 
 @cli.command("list")
 @click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
-@click.option('--project', type=click.STRING, default=None)
-@click.option('--format', type=click.Choice(['text', 'json']), default='text')
+@click.option('-p', '--project', type=click.STRING, default=None)
+@click.option('-f', '--format', type=click.Choice(['text', 'json']), default='text')
 @click.option('-color/-nc', '--color/--no-color', default=True)
 @click.option('-t', '--tpu', type=click.STRING, help="List a specific TPU by id.", multiple=True)
 @click.option('-s', '--silent', is_flag=True, help="If listing a specific TPU by ID, and there is no such TPU, don't throw an error.")
@@ -103,7 +103,7 @@ def complete_tpu_id(ctx, args, incomplete, zone=None, project=None):
 # @cli.command()
 # @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 # @click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
-# @click.option('--project', type=click.STRING, default=None)
+# @click.option('-p', '--project', type=click.STRING, default=None)
 # def create(tpu, zone, project):
 #   tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone, project=project)
 #   create = tpunicorn.create_tpu_command(tpu)
@@ -239,7 +239,7 @@ def create(ctx, tpu, zone, version, accelerator_type, data_disk, async_, descrip
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 @click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
-@click.option('--project', type=click.STRING, default=None)
+@click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
 @click.option('--async', 'async_', is_flag=True)
@@ -265,7 +265,7 @@ def delete(tpu, zone, project, yes, dry_run, async_):
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 @click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
-@click.option('--project', type=click.STRING, default=None)
+@click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
 @click.option('--async', 'async_', is_flag=True)
@@ -291,7 +291,7 @@ def stop(tpu, zone, project, yes, dry_run, async_):
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 @click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
-@click.option('--project', type=click.STRING, default=None)
+@click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
 @click.option('--async', 'async_', is_flag=True)
@@ -317,7 +317,7 @@ def start(tpu, zone, project, yes, dry_run, async_):
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 @click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
-@click.option('--project', type=click.STRING, default=None)
+@click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('--version', type=click.STRING, metavar="<TF_VERSION>",
               help="By default, the TPU is reimaged with the same system software version."
                    " (This is handy as a quick way to reboot a TPU, freeing up all memory.)"
@@ -347,7 +347,7 @@ def reimage(tpu, zone, project, version, yes, dry_run, async_):
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 @click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
-@click.option('--project', type=click.STRING, default=None)
+@click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('--version', type=click.STRING, metavar="<TF_VERSION>",
               help="By default, the TPU is recreated with the same system software version."
                    " You can set this to use a specific version, e.g. `nightly`.")
@@ -406,7 +406,7 @@ def recreate(tpu, zone, project, version, yes, dry_run, preempted, command, retr
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
 @click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
-@click.option('--project', type=click.STRING, default=None)
+@click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('--dry-run', is_flag=True)
 @click.option('-i', '--interval', type=click.INT, default=30, metavar='<seconds>',
               help='How often to check the TPU. (default: 30 seconds)')
