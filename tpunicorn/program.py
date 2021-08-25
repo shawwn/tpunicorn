@@ -29,6 +29,25 @@ logging.setLevel(pylogging.WARNING)
 
 from ._version import binary_names
 
+class ZoneChoice(click.Choice):
+  def __init__(self):
+    choices = []
+    choices.extend(tpunicorn.tpu.get_zone_abbreviations(only_unambiguous_results=True))
+    choices.extend(tpunicorn.tpu.get_tpu_zones())
+    super().__init__(choices)
+  def convert(self, value, param, ctx):
+    value = tpunicorn.tpu.expand_zone_abbreviations(value)
+    return super().convert(value, param, ctx)
+  def get_metavar(self, param):
+    # return '[available zones: {' + ', '.join(tpunicorn.tpu.get_tpu_zones()) + '} or abbreviation: {' + ', '.join(tpunicorn.tpu.get_zone_abbreviations(only_unambiguous_results=True)) + '}]'
+    return '[full zone name or abbreviation]'
+
+
+def tpu_zone_option():
+  return click.option('-z', '--zone', type=ZoneChoice(), help=''
+    'available zones: {' + ', '.join(tpunicorn.tpu.get_tpu_zones()) + '}\n'
+    'or use abbreviations: {' + ', '.join(tpunicorn.tpu.get_zone_abbreviations(only_unambiguous_results=True)) + '}')
+
 # https://stackoverflow.com/questions/58666831/how-to-implement-version-using-python-click/58666832#58666832
 
 @click.group()
@@ -83,16 +102,17 @@ def print_tpus_status(zone=None, project=None, format='text', color=True):
       print_tpu_status(tpu, color=color, project=project)
 
 @cli.command()
-@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@tpu_zone_option()
 @click.option('-p', '--project', type=click.STRING, default=None)
 def top(zone, project):
+  """Like `top` for TPUs; lists TPU status every 5 sec."""
   while True:
     click.clear()
     print_tpus_status(zone=zone, project=project)
     time.sleep(5.0)
 
 @cli.command("list")
-@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@tpu_zone_option()
 @click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('-f', '--format', type=click.Choice(['text', 'json']), default='text')
 @click.option('-color/-nc', '--color/--no-color', default=True)
@@ -117,7 +137,7 @@ def complete_tpu_id(ctx, args, incomplete, zone=None, project=None):
 
 # @cli.command()
 # @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
-# @click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+# @tpu_zone_option()
 # @click.option('-p', '--project', type=click.STRING, default=None)
 # def create(tpu, zone, project):
 #   tpu = tpunicorn.get_tpu(tpu=tpu, zone=zone, project=project)
@@ -174,7 +194,7 @@ def do_step(label=None, command=None, dry_run=False, delay_after=1.0, args=(), k
 
 @cli.command()
 @click.argument('tpu', type=click.STRING, metavar="[TPU; default=\"0+\"]", default="0+", autocompletion=complete_tpu_id)
-@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@tpu_zone_option()
 @click.option('-v', '--version', type=click.STRING, metavar="[VERSION; default=\"v2-alpha\"]", default="v2-alpha",
               help="By default, the TPU version is v2-alpha, which means it's created as a TPU VM."
               " If you want to create a regular Tensorflow TPU, you can do so with e.g. --version nightly or --version 1.15.3")
@@ -253,7 +273,7 @@ def create(ctx, tpu, zone, version, accelerator_type, data_disk, async_, descrip
 
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
-@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@tpu_zone_option()
 @click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
@@ -279,7 +299,7 @@ def delete(tpu, zone, project, yes, dry_run, async_):
 
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
-@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@tpu_zone_option()
 @click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
@@ -305,7 +325,7 @@ def stop(tpu, zone, project, yes, dry_run, async_):
 
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
-@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@tpu_zone_option()
 @click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
 @click.option('--dry-run', is_flag=True)
@@ -331,7 +351,7 @@ def start(tpu, zone, project, yes, dry_run, async_):
 
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
-@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@tpu_zone_option()
 @click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('--version', type=click.STRING, metavar="<TF_VERSION>",
               help="By default, the TPU is reimaged with the same system software version."
@@ -361,7 +381,7 @@ def reimage(tpu, zone, project, version, yes, dry_run, async_):
 
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
-@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@tpu_zone_option()
 @click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('--version', type=click.STRING, metavar="<TF_VERSION>",
               help="By default, the TPU is recreated with the same system software version."
@@ -420,7 +440,7 @@ def recreate(tpu, zone, project, version, yes, dry_run, preempted, command, retr
 
 @cli.command()
 @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
-@click.option('-z', '--zone', type=click.Choice(tpunicorn.tpu.get_tpu_zones()))
+@tpu_zone_option()
 @click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('--dry-run', is_flag=True)
 @click.option('-i', '--interval', type=click.INT, default=30, metavar='<seconds>',
@@ -497,20 +517,6 @@ def install_completion(shell, yes, dry_run):
       return
   for label, command, args, kwargs in tasks:
     do_step(label + '..', command, args=args, kwargs=kwargs)
-
-@cli.group()
-@click.pass_context
-def vm(ctx):
-  import pdb; pdb.set_trace()
-  pass
-
-
-# @vm.command(name='create')
-# @click.pass_context
-# def vm_create(ctx, *args, **kws):
-#   return ctx.forward(create, ctx, *args, **kws)
-
-vm.add_command(create)
 
 
 def main(*args, prog_name='tpunicorn', auto_envvar_prefix='TPUNICORN', **kws):
