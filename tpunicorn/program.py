@@ -213,7 +213,7 @@ def do_step(label=None, command=None, dry_run=False, delay_after=1.0, args=(), k
 def create(ctx, tpu, zone, version, accelerator_type, data_disk, async_, description, network, subnetwork, preemptible, range, project, yes, dry_run):
   if tpu.endswith('+'):
     index = int(tpu[:-1])
-    index = tpunicorn.tpu.get_next_available_tpu_index(index, project=project, zone=zone)
+    index = tpunicorn.tpu.get_next_available_tpu_index(index, project=project)
     tpu = str(index)
   else:
     index = tpunicorn.tpu.parse_tpu_index(tpu)
