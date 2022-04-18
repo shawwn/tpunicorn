@@ -136,7 +136,7 @@ def complete_tpu_id(ctx, args, incomplete, zone=None, project=None):
   return [tpunicorn.tpu.parse_tpu_id(tpu) for tpu in tpus]
 
 # @cli.command()
-# @click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
+# @click.argument('tpu', type=click.STRING, shell_complete=complete_tpu_id)
 # @tpu_zone_option()
 # @click.option('-p', '--project', type=click.STRING, default=None)
 # def create(tpu, zone, project):
@@ -193,7 +193,7 @@ def do_step(label=None, command=None, dry_run=False, delay_after=1.0, args=(), k
   return result
 
 @cli.command()
-@click.argument('tpu', type=click.STRING, metavar="[TPU; default=\"0+\"]", default="0+", autocompletion=complete_tpu_id)
+@click.argument('tpu', type=click.STRING, metavar="[TPU; default=\"0+\"]", default="0+", shell_complete=complete_tpu_id)
 @tpu_zone_option()
 @click.option('-v', '--version', type=click.STRING, metavar="[VERSION; default=\"v2-alpha\"]", default="v2-alpha",
               help="By default, the TPU version is v2-alpha, which means it's created as a TPU VM."
@@ -272,7 +272,7 @@ def create(ctx, tpu, zone, version, accelerator_type, data_disk, async_, descrip
 
 
 @cli.command()
-@click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
+@click.argument('tpu', type=click.STRING, shell_complete=complete_tpu_id)
 @tpu_zone_option()
 @click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
@@ -298,7 +298,7 @@ def delete(tpu, zone, project, yes, dry_run, async_):
     create)
 
 @cli.command()
-@click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
+@click.argument('tpu', type=click.STRING, shell_complete=complete_tpu_id)
 @tpu_zone_option()
 @click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
@@ -324,7 +324,7 @@ def stop(tpu, zone, project, yes, dry_run, async_):
     start)
 
 @cli.command()
-@click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
+@click.argument('tpu', type=click.STRING, shell_complete=complete_tpu_id)
 @tpu_zone_option()
 @click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
@@ -350,7 +350,7 @@ def start(tpu, zone, project, yes, dry_run, async_):
     stop)
 
 @cli.command()
-@click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
+@click.argument('tpu', type=click.STRING, shell_complete=complete_tpu_id)
 @tpu_zone_option()
 @click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('--version', type=click.STRING, metavar="<TF_VERSION>",
@@ -380,7 +380,7 @@ def reimage(tpu, zone, project, version, yes, dry_run, async_):
       'would be' if dry_run else 'is'))
 
 @cli.command()
-@click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
+@click.argument('tpu', type=click.STRING, shell_complete=complete_tpu_id)
 @tpu_zone_option()
 @click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('--version', type=click.STRING, metavar="<TF_VERSION>",
@@ -440,7 +440,7 @@ def recreate(tpu, zone, project, version, yes, dry_run, preempted, command, retr
 
 
 @cli.command()
-@click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
+@click.argument('tpu', type=click.STRING, shell_complete=complete_tpu_id)
 @tpu_zone_option()
 @click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('-y', '--yes', is_flag=True)
@@ -462,7 +462,7 @@ def ssh(tpu, zone, project, yes, dry_run, ssh_flag):
 
 
 @cli.command()
-@click.argument('tpu', type=click.STRING, autocompletion=complete_tpu_id)
+@click.argument('tpu', type=click.STRING, shell_complete=complete_tpu_id)
 @tpu_zone_option()
 @click.option('-p', '--project', type=click.STRING, default=None)
 @click.option('--dry-run', is_flag=True)
