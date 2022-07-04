@@ -37,7 +37,7 @@ setuptools.setup(
     author_email="shawnpresser@gmail.com",
     url="https://github.com/shawwn/tpunicorn",
     install_requires=[
-        'Click>=7.1.2',
+        'Click>=7.1.2,<8.0',
         'six>=1.11.0',
         'ring>=0.7.3',
         'moment>=0.0.10',
