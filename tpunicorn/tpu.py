@@ -889,7 +889,7 @@ def reimage_tpu_command(tpu, zone=None, project=None, version=None, async_=False
                            async_=async_,
                            )
 
-def ssh_tpu_command(tpu, zone=None, project=None, ssh_flag=None):
+def ssh_tpu_command(tpu, zone=None, project=None, ssh_flag=None, worker=None):
   if zone is None:
     zone = parse_tpu_zone(tpu)
   if project is None:
@@ -899,4 +899,5 @@ def ssh_tpu_command(tpu, zone=None, project=None, ssh_flag=None):
                            zone=zone,
                            project=project,
                            ssh_flag=ssh_flag,
+                           worker=worker,
                            )
